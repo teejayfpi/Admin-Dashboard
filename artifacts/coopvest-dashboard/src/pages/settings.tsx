@@ -56,9 +56,9 @@ interface PaymentAccount {
 }
 
 const defaultPaymentAccount: PaymentAccount = {
-  bank: "Opay",
-  accountName: "Ayanlowo Olatunji Ayobami",
-  accountNumber: "7038193753",
+  bank: "",
+  accountName: "",
+  accountNumber: "",
 };
 
 export default function Settings() {
