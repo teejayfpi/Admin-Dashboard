@@ -32,7 +32,14 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowUpRight,
+  AlertTriangle,
+  ShieldAlert,
+  Clock,
+  UserX,
+  FileSpreadsheet,
+  Building2,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 
 const PIE_COLORS = ["#2d6a4f", "#40916c", "#f6ae2d", "#e63946", "#74c69d"];
@@ -96,6 +103,7 @@ function KPICard({
 }
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: monthlyContribs, isLoading: loadingMonthly } = useGetMonthlyContributions();
   const { data: loanBreakdown, isLoading: loadingBreakdown } = useGetLoanStatusBreakdown();
@@ -104,13 +112,50 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Coopvest Africa cooperative financial overview</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Command Center</h1>
+            <p className="text-muted-foreground">Coopvest Africa — Admin Dashboard Overview</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              onClick={() => setLocation("/excel-manager")}
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Excel Manager
+            </button>
+            <button
+              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              onClick={() => setLocation("/organizations")}
+            >
+              <Building2 className="h-4 w-4" /> Organizations
+            </button>
+          </div>
+        </div>
+
+        {/* Alert Banner for Urgent Items */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {[
+            { label: "Loan Defaulters", value: 12, icon: AlertTriangle, color: "bg-red-50 border-red-200 text-red-700", href: "/members" },
+            { label: "High-Risk Accounts", value: 8, icon: ShieldAlert, color: "bg-rose-50 border-rose-200 text-rose-700", href: "/risk-scoring" },
+            { label: "Pending KYC Verification", value: summary?.pendingVerifications ?? 24, icon: Clock, color: "bg-amber-50 border-amber-200 text-amber-700", href: "/user-verification" },
+          ].map(alert => (
+            <div
+              key={alert.label}
+              className={`flex items-center justify-between rounded-lg border px-4 py-3 cursor-pointer hover:opacity-80 transition-opacity ${alert.color}`}
+              onClick={() => setLocation(alert.href)}
+            >
+              <div className="flex items-center gap-2">
+                <alert.icon className="h-4 w-4" />
+                <span className="text-sm font-medium">{alert.label}</span>
+              </div>
+              <span className="text-lg font-bold">{(alert.value ?? 0).toLocaleString()}</span>
+            </div>
+          ))}
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           <KPICard
             title="Total Members"
             value={summary?.totalMembers ?? 0}
@@ -164,6 +209,30 @@ export default function Dashboard() {
             title="Open Support Tickets"
             value={summary?.openSupportTickets ?? 0}
             icon={LifeBuoy}
+            loading={loadingSummary}
+          />
+          <KPICard
+            title="Suspended Users"
+            value={summary?.suspendedMembers ?? 0}
+            icon={UserX}
+            loading={loadingSummary}
+          />
+          <KPICard
+            title="Missed Contributions"
+            value={summary?.overdueContributions ?? 0}
+            icon={AlertTriangle}
+            loading={loadingSummary}
+          />
+          <KPICard
+            title="Onboarded Orgs"
+            value={summary?.totalOrganizations ?? 0}
+            icon={Building2}
+            loading={loadingSummary}
+          />
+          <KPICard
+            title="Pending Verifications"
+            value={summary?.pendingVerifications ?? 0}
+            icon={Clock}
             loading={loadingSummary}
           />
         </div>

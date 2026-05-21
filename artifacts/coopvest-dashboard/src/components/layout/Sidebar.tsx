@@ -26,7 +26,8 @@ import {
   ArrowDownToLine,
   BadgeCheck,
   Gift,
-  HandshakeIcon
+  HandshakeIcon,
+  FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ const sidebarGroups = [
       { title: "Loans", icon: CreditCard, href: "/loans" },
       { title: "Contributions", icon: Wallet, href: "/contributions" },
       { title: "Payroll", icon: Briefcase, href: "/payroll" },
+      { title: "Excel Manager", icon: FileSpreadsheet, href: "/excel-manager" },
       { title: "Investments", icon: PieChart, href: "/investments" },
     ],
   },

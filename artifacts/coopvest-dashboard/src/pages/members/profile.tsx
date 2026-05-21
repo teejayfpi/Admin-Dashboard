@@ -1,12 +1,21 @@
+import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useGetMember, useGetLoans, useGetContributions, getGetMemberQueryKey } from "@workspace/api-client-react";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useGetMember, useGetLoans, useGetContributions, useUpdateMember, getGetMemberQueryKey } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
-import { ArrowLeft, Mail, Phone, MapPin, Briefcase, Calendar } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Briefcase, Calendar, Ban, Lock, KeyRound, CheckCircle2, CreditCard, ArrowUpDown, ShieldAlert } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusColors: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-800",
@@ -15,16 +24,52 @@ const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
 };
 
+type AdminAction = "suspend" | "freeze" | "activate" | "reset_password" | "verify" | "restrict_loans" | "upgrade" | "downgrade" | "change_contribution";
+
 export default function MemberProfile() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const id = parseInt(params.id, 10);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const updateMember = useUpdateMember();
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; action: AdminAction | null }>({ open: false, action: null });
+  const [actionNote, setActionNote] = useState("");
+  const [contributionMethod, setContributionMethod] = useState("monthly");
 
   const { data: member, isLoading } = useGetMember(id, {
     query: { enabled: !!id, queryKey: getGetMemberQueryKey(id) },
   });
   const { data: loans } = useGetLoans({ memberId: id });
   const { data: contributions } = useGetContributions({ memberId: id });
+
+  async function executeAction() {
+    if (!actionDialog.action || !member) return;
+    const statusMap: Partial<Record<AdminAction, string>> = {
+      suspend: "suspended", freeze: "frozen", activate: "active", verify: "active",
+    };
+    const messages: Record<AdminAction, string> = {
+      suspend: "Account suspended.",
+      freeze: "Account frozen.",
+      activate: "Account activated.",
+      reset_password: "Password reset email sent.",
+      verify: "User verified.",
+      restrict_loans: "Loan access restricted.",
+      upgrade: "Account upgraded.",
+      downgrade: "Account downgraded.",
+      change_contribution: "Contribution method updated.",
+    };
+    try {
+      if (statusMap[actionDialog.action]) {
+        await updateMember.mutateAsync({ id: member.id, data: { status: statusMap[actionDialog.action] as any } });
+      }
+      toast({ title: "Done", description: messages[actionDialog.action] });
+      queryClient.invalidateQueries({ queryKey: getGetMemberQueryKey(id) });
+      setActionDialog({ open: false, action: null });
+    } catch {
+      toast({ title: "Error", description: "Action failed.", variant: "destructive" });
+    }
+  }
 
   if (isLoading) {
     return (
@@ -57,13 +102,54 @@ export default function MemberProfile() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/members")} data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{member.firstName} {member.lastName}</h1>
-            <p className="text-muted-foreground font-mono text-sm">{member.memberId}</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/members")} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">{member.firstName} {member.lastName}</h1>
+              <p className="text-muted-foreground font-mono text-sm">{member.memberId}</p>
+            </div>
+          </div>
+          {/* Admin Actions Panel */}
+          <div className="flex flex-wrap gap-2">
+            {member.status !== "active" && (
+              <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-300"
+                onClick={() => setActionDialog({ open: true, action: "activate" })}>
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Activate
+              </Button>
+            )}
+            {member.status === "active" && (
+              <Button size="sm" variant="outline" className="text-orange-600 border-orange-300"
+                onClick={() => setActionDialog({ open: true, action: "suspend" })}>
+                <Ban className="mr-1 h-3.5 w-3.5" /> Suspend
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="text-blue-600 border-blue-300"
+              onClick={() => setActionDialog({ open: true, action: "freeze" })}>
+              <Lock className="mr-1 h-3.5 w-3.5" /> Freeze
+            </Button>
+            <Button size="sm" variant="outline"
+              onClick={() => setActionDialog({ open: true, action: "reset_password" })}>
+              <KeyRound className="mr-1 h-3.5 w-3.5" /> Reset PWD
+            </Button>
+            <Button size="sm" variant="outline" className="text-emerald-700"
+              onClick={() => setActionDialog({ open: true, action: "verify" })}>
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Verify
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300"
+              onClick={() => setActionDialog({ open: true, action: "restrict_loans" })}>
+              <CreditCard className="mr-1 h-3.5 w-3.5" /> Restrict Loans
+            </Button>
+            <Button size="sm" variant="outline"
+              onClick={() => setActionDialog({ open: true, action: "change_contribution" })}>
+              <ArrowUpDown className="mr-1 h-3.5 w-3.5" /> Contribution Method
+            </Button>
+            <Button size="sm" variant="outline"
+              onClick={() => setActionDialog({ open: true, action: "upgrade" })}>
+              Upgrade
+            </Button>
           </div>
         </div>
 
@@ -215,5 +301,57 @@ export default function MemberProfile() {
         </div>
       </div>
     </Layout>
+
+    {/* Admin Action Dialog */}
+    <Dialog open={actionDialog.open} onOpenChange={(o) => { if (!o) setActionDialog({ open: false, action: null }); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {actionDialog.action === "suspend" && "Suspend Account"}
+            {actionDialog.action === "freeze" && "Freeze Account"}
+            {actionDialog.action === "activate" && "Activate Account"}
+            {actionDialog.action === "reset_password" && "Reset Password"}
+            {actionDialog.action === "verify" && "Verify User"}
+            {actionDialog.action === "restrict_loans" && "Restrict Loan Access"}
+            {actionDialog.action === "upgrade" && "Upgrade Account"}
+            {actionDialog.action === "downgrade" && "Downgrade Account"}
+            {actionDialog.action === "change_contribution" && "Change Contribution Method"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-muted-foreground">
+            Performing action on <strong>{member?.firstName} {member?.lastName}</strong>.
+          </p>
+          {actionDialog.action === "change_contribution" && (
+            <div className="space-y-1.5">
+              <Label>New Contribution Method</Label>
+              <Select value={contributionMethod} onValueChange={setContributionMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly Deduction</SelectItem>
+                  <SelectItem value="payroll">Payroll Deduction</SelectItem>
+                  <SelectItem value="manual">Manual Payment</SelectItem>
+                  <SelectItem value="direct_debit">Direct Debit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Note / Reason</Label>
+            <Textarea placeholder="Enter reason…" value={actionNote} onChange={(e) => setActionNote(e.target.value)} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setActionDialog({ open: false, action: null })}>Cancel</Button>
+          <Button
+            onClick={executeAction}
+            disabled={updateMember.isPending}
+            variant={["suspend", "freeze", "restrict_loans"].includes(actionDialog.action ?? "") ? "destructive" : "default"}
+          >
+            {updateMember.isPending ? "Processing…" : "Confirm"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

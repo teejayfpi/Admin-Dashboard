@@ -31,6 +31,7 @@ import WithdrawalManagement from "@/pages/withdrawal-management/index";
 import UserVerification from "@/pages/user-verification/index";
 import ReferralProgram from "@/pages/referral-program/index";
 import GuarantorSystem from "@/pages/guarantor-system/index";
+import ExcelManager from "@/pages/excel-manager/index";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/user-verification">{() => <ProtectedRoute component={UserVerification} />}</Route>
       <Route path="/referral-program">{() => <ProtectedRoute component={ReferralProgram} />}</Route>
       <Route path="/guarantor-system">{() => <ProtectedRoute component={GuarantorSystem} />}</Route>
+      <Route path="/excel-manager">{() => <ProtectedRoute component={ExcelManager} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
