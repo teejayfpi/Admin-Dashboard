@@ -1,7 +1,10 @@
 import { Router, type IRouter } from "express";
 import { supabase } from "@workspace/db";
+// Fix #4: Role-protected endpoints
+import { requireAuth, requireRole } from "../middleware/auth";
 
 const router: IRouter = Router();
+router.use(requireAuth);
 
 router.get("/support-tickets/summary", async (req, res): Promise<void> => {
   const { count: total } = await supabase.from("tickets").select("*", { count: "exact", head: true });
@@ -113,7 +116,8 @@ router.post("/support-tickets/:id/reply", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/support-tickets/:id/close", async (req, res): Promise<void> => {
+// Fix #4: Closing/resolving a ticket requires at least operator role
+router.post("/support-tickets/:id/close", requireRole("operator"), async (req, res): Promise<void> => {
   const id = req.params.id;
   const { data: ticket, error } = await supabase.from("tickets").update({
     status: "closed",
