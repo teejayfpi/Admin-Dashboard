@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,34 +121,16 @@ const ROLES: Record<RoleKey, { label: string; description: string; color: string
   },
 };
 
-// ── Mock Staff Data ───────────────────────────────────────────────────────────
-const MOCK_STAFF: StaffAccount[] = [
-  {
-    id: 1, name: "Chukwuemeka Obi", email: "c.obi@coopvest.ng", phone: "08012345678",
-    role: "super_admin", status: "active", createdAt: "2023-01-15", lastLogin: "2025-05-21",
-    mfaEnabled: true, createdBy: "System", permissions: ROLE_PERMISSIONS.super_admin,
-  },
-  {
-    id: 2, name: "Aisha Mohammed", email: "a.mohammed@coopvest.ng", phone: "08023456789",
-    role: "finance_admin", status: "active", createdAt: "2023-06-01", lastLogin: "2025-05-21",
-    mfaEnabled: true, createdBy: "c.obi@coopvest.ng", permissions: ROLE_PERMISSIONS.finance_admin,
-  },
-  {
-    id: 3, name: "Taiwo Adeyemi", email: "t.adeyemi@coopvest.ng", phone: "08034567890",
-    role: "loan_officer", status: "active", createdAt: "2024-02-10", lastLogin: "2025-05-21",
-    mfaEnabled: false, createdBy: "c.obi@coopvest.ng", permissions: ROLE_PERMISSIONS.loan_officer,
-  },
-  {
-    id: 4, name: "Ngozi Okeke", email: "n.okeke@coopvest.ng", phone: "08045678901",
-    role: "customer_support", status: "active", createdAt: "2024-04-20", lastLogin: "2025-05-21",
-    mfaEnabled: true, createdBy: "c.obi@coopvest.ng", permissions: ROLE_PERMISSIONS.customer_support,
-  },
-  {
-    id: 5, name: "Babatunde Salami", email: "b.salami@coopvest.ng", phone: "08056789012",
-    role: "loan_officer", status: "suspended", createdAt: "2024-03-05", lastLogin: "2025-05-15",
-    mfaEnabled: false, createdBy: "c.obi@coopvest.ng", permissions: ROLE_PERMISSIONS.loan_officer,
-  },
-];
+// ── API Staff Type ────────────────────────────────────────────────────────────
+interface ApiStaffAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  lastActive: string;
+  createdAt: string;
+}
 
 // ── Form State ────────────────────────────────────────────────────────────────
 const defaultForm = {
@@ -159,19 +141,31 @@ const defaultForm = {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RoleManagement() {
   const [activeTab, setActiveTab] = useState("staff");
-  const [staff, setStaff] = useState<StaffAccount[]>(MOCK_STAFF);
+  const [apiStaff, setApiStaff] = useState<ApiApiStaffAccount[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [editStaff, setEditStaff] = useState<StaffAccount | null>(null);
-  const [permEditStaff, setPermEditStaff] = useState<StaffAccount | null>(null);
+  const [editStaff, setEditStaff] = useState<ApiStaffAccount | null>(null);
+  const [permEditStaff, setPermEditStaff] = useState<ApiStaffAccount | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
 
+  useEffect(() => {
+    setLoadingStaff(true);
+    fetch("/api/roles", { headers: { "Content-Type": "application/json" } })
+      .then(r => r.json())
+      .then(d => { setApiStaff((d as { admins?: ApiApiStaffAccount[] }).admins ?? []); })
+      .catch(() => setApiStaff([]))
+      .finally(() => setLoadingStaff(false));
+  }, []);
+
+  const staff = apiStaff;
+
   // Group permissions by category
   const categories = [...new Set(ALL_PERMISSIONS.map(p => p.category))];
 
-  const filtered = staff.filter(s =>
+  const filtered = staff.filter((s: ApiStaffAccount) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.email.toLowerCase().includes(search.toLowerCase()) ||
     ROLES[s.role].label.toLowerCase().includes(search.toLowerCase())
@@ -184,16 +178,16 @@ export default function RoleManagement() {
     }
     setCreating(true);
     await new Promise(r => setTimeout(r, 800));
-    const newStaff: StaffAccount = {
-      id: staff.length + 1,
-      name: form.name, email: form.email, phone: form.phone,
+    const newStaff: ApiStaffAccount = {
+      id: apiStaff.length + 1,
+      name: form.name, email: form.email, phone: "",
       role: form.role, status: "active",
       createdAt: new Date().toISOString().split("T")[0],
       lastLogin: "—",
       mfaEnabled: false, createdBy: "c.obi@coopvest.ng",
       permissions: ROLE_PERMISSIONS[form.role],
     };
-    setStaff(prev => [...prev, newStaff]);
+    setApiStaff(prev => [...prev, newStaff]);
     toast({ title: "Staff Account Created", description: `${form.name} has been added as ${ROLES[form.role].label}.` });
     setForm(defaultForm);
     setShowCreateDialog(false);
@@ -201,22 +195,22 @@ export default function RoleManagement() {
   }
 
   function toggleStatus(id: number) {
-    setStaff(prev => prev.map(s =>
+    setApiStaff(prev => prev.map(s =>
       s.id === id ? { ...s, status: s.status === "active" ? "suspended" : "active" } : s
     ));
     const s = staff.find(s => s.id === id);
     toast({ title: s?.status === "active" ? "Account Suspended" : "Account Activated", description: `${s?.name}'s account updated.` });
   }
 
-  function savePermissions(updatedStaff: StaffAccount) {
-    setStaff(prev => prev.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+  function savePermissions(updatedStaff: ApiStaffAccount) {
+    setApiStaff(prev => prev.map(s => s.id === updatedStaff.id ? updatedStaff : s));
     setPermEditStaff(null);
     toast({ title: "Permissions Updated", description: `Custom permissions saved for ${updatedStaff.name}.` });
   }
 
   function deleteStaff(id: number) {
     const s = staff.find(s => s.id === id);
-    setStaff(prev => prev.filter(s => s.id !== id));
+    setApiStaff(prev => prev.filter(s => s.id !== id));
     toast({ title: "Account Removed", description: `${s?.name}'s account has been deleted.` });
   }
 
@@ -289,7 +283,11 @@ export default function RoleManagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filtered.map(s => (
+                      {loadingStaff ? (
+          <div className="py-8 text-center text-muted-foreground">Loading staff…</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">No staff accounts found.</div>
+        ) : filtered.map((s: ApiStaffAccount) => (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -310,7 +308,7 @@ export default function RoleManagement() {
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {s.mfaEnabled
+                            {false
                               ? <CheckCircle className="h-4 w-4 text-emerald-600 mx-auto" />
                               : <XCircle className="h-4 w-4 text-red-500 mx-auto" />}
                           </td>
@@ -319,8 +317,8 @@ export default function RoleManagement() {
                               {s.status}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-center text-xs text-muted-foreground">{s.lastLogin}</td>
-                          <td className="px-4 py-3 text-center text-xs text-muted-foreground">{s.createdBy}</td>
+                          <td className="px-4 py-3 text-center text-xs text-muted-foreground">{s.lastActive}</td>
+                          <td className="px-4 py-3 text-center text-xs text-muted-foreground">{"—"}</td>
                           <td className="px-4 py-3 text-center">
                             <div className="flex justify-center gap-1">
                               <Button variant="outline" size="sm" onClick={() => { setPermEditStaff({ ...s }); }}>
@@ -419,7 +417,7 @@ export default function RoleManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>Phone</Label>
-                <Input placeholder="0801 234 5678" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                <Input placeholder="0801 234 5678" value={""} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -490,7 +488,7 @@ export default function RoleManagement() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-2 border-b pb-1">{cat}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {ALL_PERMISSIONS.filter(p => p.category === cat).map(perm => {
-                      const has = permEditStaff.permissions.includes(perm.id);
+                      const has = [].includes(perm.id);
                       return (
                         <div key={perm.id} className="flex items-center gap-2">
                           <Checkbox
