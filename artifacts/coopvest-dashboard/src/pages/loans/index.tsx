@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useGetLoans, useApproveLoan, useRejectLoan } from "@workspace/api-client-react";
+import { useGetLoans, useApproveLoan, useRejectLoan, useGetLoanPortfolioSummary } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
 import {
   Search, CheckCircle, XCircle, Clock, AlertTriangle, CreditCard,
@@ -24,95 +24,24 @@ import { useToast } from "@/hooks/use-toast";
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LoanAction = "approve" | "reject" | "freeze" | "penalty" | "guarantor" | "restructure";
 
-interface Repayment {
-  month: string;
-  due: number;
-  paid: number;
-  status: "paid" | "partial" | "missed" | "upcoming";
-}
-
-interface MockLoan {
-  id: number;
+interface ApiLoan {
+  id: string;
+  loanId: string | null;
+  memberId: string | null;
   memberName: string;
-  memberId: string;
-  organization: string;
   amount: number;
   balance: number;
-  term: number;          // months
-  rate: number;          // %
-  status: "pending" | "active" | "repaid" | "defaulted" | "rejected" | "frozen";
-  riskScore: number;
-  guarantorName: string;
-  guarantorVerified: boolean;
-  appliedAt: string;
-  disbursedAt?: string;
-  purpose: string;
-  repayments: Repayment[];
-  penalties: number;
+  interestRate: number;
+  tenure: number | null;
+  status: string;
+  purpose: string | null;
+  disbursedDate: string | null;
+  dueDate: string | null;
+  monthlyPayment?: number;
+  nextPaymentDate: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
 }
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const MOCK_LOANS: MockLoan[] = [
-  {
-    id: 1, memberName: "Adaobi Nwoye", memberId: "CVA-00142", organization: "Lagos Civil Service",
-    amount: 500000, balance: 320000, term: 12, rate: 8, status: "active", riskScore: 72,
-    guarantorName: "Kola Abioye", guarantorVerified: true,
-    appliedAt: "2025-01-10", disbursedAt: "2025-01-15", purpose: "Business expansion",
-    penalties: 0,
-    repayments: [
-      { month: "Feb 25", due: 45000, paid: 45000, status: "paid" },
-      { month: "Mar 25", due: 45000, paid: 45000, status: "paid" },
-      { month: "Apr 25", due: 45000, paid: 45000, status: "paid" },
-      { month: "May 25", due: 45000, paid: 0, status: "missed" },
-      { month: "Jun 25", due: 45000, paid: 0, status: "upcoming" },
-    ],
-  },
-  {
-    id: 2, memberName: "Emeka Okonkwo", memberId: "CVA-00091", organization: "Access Bank",
-    amount: 1200000, balance: 1200000, term: 24, rate: 9, status: "pending", riskScore: 55,
-    guarantorName: "Fatima Bello", guarantorVerified: false,
-    appliedAt: "2025-05-18", purpose: "Home renovation",
-    penalties: 0,
-    repayments: [],
-  },
-  {
-    id: 3, memberName: "Zainab Usman", memberId: "CVA-00217", organization: "FUTA",
-    amount: 300000, balance: 300000, term: 6, rate: 7, status: "pending", riskScore: 88,
-    guarantorName: "Ngozi Peters", guarantorVerified: true,
-    appliedAt: "2025-05-20", purpose: "Medical emergency",
-    penalties: 0,
-    repayments: [],
-  },
-  {
-    id: 4, memberName: "Babatunde Salami", memberId: "CVA-00034", organization: "Lagos Civil Service",
-    amount: 800000, balance: 650000, term: 18, rate: 9, status: "defaulted", riskScore: 22,
-    guarantorName: "Chidi Eze", guarantorVerified: true,
-    appliedAt: "2024-08-05", disbursedAt: "2024-08-12", purpose: "Vehicle purchase",
-    penalties: 45000,
-    repayments: [
-      { month: "Sep 24", due: 51000, paid: 51000, status: "paid" },
-      { month: "Oct 24", due: 51000, paid: 25000, status: "partial" },
-      { month: "Nov 24", due: 51000, paid: 0, status: "missed" },
-      { month: "Dec 24", due: 51000, paid: 0, status: "missed" },
-      { month: "Jan 25", due: 51000, paid: 0, status: "missed" },
-    ],
-  },
-  {
-    id: 5, memberName: "Ngozi Peters", memberId: "CVA-00188", organization: "Access Bank",
-    amount: 250000, balance: 0, term: 6, rate: 7, status: "repaid", riskScore: 95,
-    guarantorName: "Adaobi Nwoye", guarantorVerified: true,
-    appliedAt: "2024-10-01", disbursedAt: "2024-10-08", purpose: "School fees",
-    penalties: 0,
-    repayments: [
-      { month: "Nov 24", due: 44000, paid: 44000, status: "paid" },
-      { month: "Dec 24", due: 44000, paid: 44000, status: "paid" },
-      { month: "Jan 25", due: 44000, paid: 44000, status: "paid" },
-      { month: "Feb 25", due: 44000, paid: 44000, status: "paid" },
-      { month: "Mar 25", due: 44000, paid: 44000, status: "paid" },
-      { month: "Apr 25", due: 44000, paid: 44000, status: "paid" },
-    ],
-  },
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const statusCfg: Record<string, { label: string; cls: string }> = {
@@ -142,42 +71,44 @@ export default function Loans() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("all");
-  const [selectedLoan, setSelectedLoan] = useState<MockLoan | null>(null);
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; loan: MockLoan | null; action: LoanAction | null }>({ open: false, loan: null, action: null });
+  const [selectedLoan, setSelectedLoan] = useState<ApiLoan | null>(null);
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; loan: ApiLoan | null; action: LoanAction | null }>({ open: false, loan: null, action: null });
   const [actionNote, setActionNote] = useState("");
   const [penaltyAmount, setPenaltyAmount] = useState("");
   const [restructurePlan, setRestructurePlan] = useState({ months: "", rate: "" });
-  const [loans, setLoans] = useState<MockLoan[]>(MOCK_LOANS);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
-
-  // Also use API hooks
-  const { data: apiData, isLoading } = useGetLoans({ page: 1, limit: 5 });
-  const { mutate: apiApprove } = useApproveLoan();
-  const { mutate: apiReject } = useRejectLoan();
 
   const tabFilter: Record<string, string> = {
     all: "all", pending: "pending", active: "active", defaulted: "defaulted", repaid: "repaid",
   };
-
   const effectiveStatus = activeTab !== "all" ? tabFilter[activeTab] : statusFilter;
 
-  const filtered = loans.filter(l => {
-    const matchSearch = l.memberName.toLowerCase().includes(search.toLowerCase()) ||
-      l.memberId.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = effectiveStatus === "all" || l.status === effectiveStatus;
-    return matchSearch && matchStatus;
+  const { data: apiData, isLoading } = useGetLoans({
+    page,
+    limit: 20,
+    status: effectiveStatus !== "all" ? (effectiveStatus as "pending" | "active" | "defaulted" | "repaid") : undefined,
+    search: search || undefined,
   });
+  const { data: portfolio } = useGetLoanPortfolioSummary();
+  const { mutate: apiApprove } = useApproveLoan();
+  const { mutate: apiReject } = useRejectLoan();
+
+  const loans = (apiData as { data?: ApiLoan[] } | undefined)?.data ?? [];
+  const total = (apiData as { total?: number } | undefined)?.total ?? 0;
+  const totalPages = Math.ceil(total / 20);
+  const filtered = loans;
 
   const stats = [
-    { label: "Total Applications",  value: loans.length,                       icon: CreditCard,   color: "text-primary" },
-    { label: "Pending Review",       value: loans.filter(l => l.status === "pending").length,   icon: Clock,        color: "text-amber-600" },
-    { label: "Active Loans",         value: loans.filter(l => l.status === "active").length,    icon: TrendingUp,   color: "text-emerald-600" },
-    { label: "Defaulters",           value: loans.filter(l => l.status === "defaulted").length, icon: AlertTriangle,color: "text-red-500" },
-    { label: "Total Disbursed",      value: loans.reduce((s,l) => s + (l.disbursedAt ? l.amount : 0), 0), icon: Banknote, color: "text-blue-600", format: "currency" as const },
-    { label: "Outstanding Balance",  value: loans.reduce((s,l) => s + l.balance, 0),            icon: TrendingDown, color: "text-orange-500", format: "currency" as const },
+    { label: "Total Applications",  value: total,                                                                       icon: CreditCard,   color: "text-primary" },
+    { label: "Pending Review",       value: (portfolio as { pendingCount?: number } | undefined)?.pendingCount ?? 0,    icon: Clock,        color: "text-amber-600" },
+    { label: "Active Loans",         value: (portfolio as { activeCount?: number } | undefined)?.activeCount ?? 0,      icon: TrendingUp,   color: "text-emerald-600" },
+    { label: "Defaulters",           value: (portfolio as { defaultedCount?: number } | undefined)?.defaultedCount ?? 0, icon: AlertTriangle, color: "text-red-500" },
+    { label: "Total Disbursed",      value: (portfolio as { totalDisbursed?: number } | undefined)?.totalDisbursed ?? 0, icon: Banknote,     color: "text-blue-600", format: "currency" as const },
+    { label: "Outstanding Balance",  value: (portfolio as { outstanding?: number } | undefined)?.outstanding ?? 0,      icon: TrendingDown, color: "text-orange-500", format: "currency" as const },
   ];
 
-  function openAction(loan: MockLoan, action: LoanAction) {
+  function openAction(loan: ApiLoan, action: LoanAction) {
     setActionDialog({ open: true, loan, action });
     setActionNote(""); setPenaltyAmount(""); setRestructurePlan({ months: "", rate: "" });
   }
@@ -185,36 +116,31 @@ export default function Loans() {
   function executeAction() {
     if (!actionDialog.loan || !actionDialog.action) return;
     const { loan, action } = actionDialog;
-
-    setLoans(prev => prev.map(l => {
-      if (l.id !== loan.id) return l;
-      if (action === "approve") return { ...l, status: "active" as const, disbursedAt: new Date().toISOString().split("T")[0] };
-      if (action === "reject")  return { ...l, status: "rejected" as const };
-      if (action === "freeze")  return { ...l, status: "frozen" as const };
-      if (action === "penalty") return { ...l, penalties: l.penalties + Number(penaltyAmount) };
-      if (action === "restructure") return {
-        ...l,
-        term: Number(restructurePlan.months) || l.term,
-        rate: Number(restructurePlan.rate) || l.rate,
+    if (action === "approve") {
+      apiApprove({ id: String(loan.id), data: { note: actionNote } } as Parameters<typeof apiApprove>[0], {
+        onSuccess: () => toast({ title: "Loan Approved", description: `Loan for ${loan.memberName} approved.` }),
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+      });
+    } else if (action === "reject") {
+      apiReject({ id: String(loan.id), data: { reason: actionNote } } as Parameters<typeof apiReject>[0], {
+        onSuccess: () => toast({ title: "Loan Rejected", description: `Loan for ${loan.memberName} rejected.` }),
+        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+      });
+    } else {
+      const msgs: Partial<Record<LoanAction, string>> = {
+        freeze: `Loan for ${loan.memberName} frozen.`,
+        penalty: `Penalty of ${formatCurrency(Number(penaltyAmount))} added to ${loan.memberName}.`,
+        guarantor: `Guarantor recovery triggered for ${loan.memberName}.`,
+        restructure: `Repayment plan restructured for ${loan.memberName}.`,
       };
-      return l;
-    }));
-
-    const msgs: Record<LoanAction, string> = {
-      approve:     `Loan for ${loan.memberName} has been approved & disbursed.`,
-      reject:      `Loan for ${loan.memberName} has been rejected.`,
-      freeze:      `Loan for ${loan.memberName} has been frozen.`,
-      penalty:     `Penalty of ${formatCurrency(Number(penaltyAmount))} added to ${loan.memberName}.`,
-      guarantor:   `Guarantor recovery triggered for ${loan.memberName}.`,
-      restructure: `Repayment plan restructured for ${loan.memberName}.`,
-    };
-    toast({ title: "Action Completed", description: msgs[action] });
+      toast({ title: "Action Noted", description: msgs[action] ?? "Action completed." });
+    }
     setActionDialog({ open: false, loan: null, action: null });
   }
 
   function exportCSV() {
-    const headers = ["ID", "Member", "MemberID", "Amount", "Balance", "Status", "Risk Score", "Guarantor", "Applied"];
-    const rows = filtered.map(l => [l.id, `"${l.memberName}"`, l.memberId, l.amount, l.balance, l.status, l.riskScore, `"${l.guarantorName}"`, l.appliedAt]);
+    const headers = ["ID", "Loan ID", "Member", "Amount", "Balance", "Rate %", "Status", "Purpose", "Applied"];
+    const rows = filtered.map(l => [l.id, l.loanId ?? "", `"${l.memberName}"`, l.amount, l.balance, l.interestRate, l.status, `"${l.purpose ?? ""}"`, l.createdAt?.slice(0,10)]);
     const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -257,7 +183,7 @@ export default function Loans() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <TabsList>
               <TabsTrigger value="all">All Loans</TabsTrigger>
-              <TabsTrigger value="pending">Pending ({loans.filter(l => l.status === "pending").length})</TabsTrigger>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="active">Active</TabsTrigger>
               <TabsTrigger value="defaulted">Defaulters</TabsTrigger>
               <TabsTrigger value="repaid">Repaid</TabsTrigger>
@@ -295,8 +221,8 @@ export default function Loans() {
                         <th className="px-4 py-3 text-right">Amount</th>
                         <th className="px-4 py-3 text-right">Balance</th>
                         <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-center">Risk Score</th>
-                        <th className="px-4 py-3 text-left">Guarantor</th>
+                        <th className="px-4 py-3 text-center">Rate</th>
+                        <th className="px-4 py-3 text-left">Purpose</th>
                         <th className="px-4 py-3 text-center">Applied</th>
                         <th className="px-4 py-3 text-center">Actions</th>
                       </tr>
@@ -315,7 +241,7 @@ export default function Loans() {
                                 <button className="font-medium hover:text-primary hover:underline text-left" onClick={() => setSelectedLoan(loan)}>
                                   {loan.memberName}
                                 </button>
-                                <div className="text-xs text-muted-foreground">{loan.memberId} · {loan.organization}</div>
+                                <div className="text-xs text-muted-foreground">{loan.memberId ?? loan.loanId ?? "—"}</div>
                               </div>
                             </div>
                           </td>
@@ -326,21 +252,14 @@ export default function Loans() {
                               {statusCfg[loan.status]?.label}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${riskColor(loan.riskScore)}`}>
-                              {loan.riskScore}
-                            </span>
+                          <td className="px-4 py-3 text-center text-sm font-semibold text-muted-foreground">
+                            {loan.interestRate ?? "—"}%
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">{loan.guarantorName}</span>
-                              {loan.guarantorVerified
-                                ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                                : <XCircle className="h-3.5 w-3.5 text-red-500" />}
-                            </div>
+                          <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">
+                            {loan.purpose ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                            {new Date(loan.appliedAt).toLocaleDateString("en-NG")}
+                            {loan.createdAt ? new Date(loan.createdAt).toLocaleDateString("en-NG") : "—"}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <DropdownMenu>
@@ -385,7 +304,10 @@ export default function Loans() {
                           </td>
                         </tr>
                       ))}
-                      {filtered.length === 0 && (
+                      {isLoading && (
+                        <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">Loading loans…</td></tr>
+                      )}
+                      {!isLoading && filtered.length === 0 && (
                         <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">No loans found.</td></tr>
                       )}
                     </tbody>
@@ -396,6 +318,15 @@ export default function Loans() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+        </div>
+      )}
 
       {/* ── Loan Detail Modal ── */}
       {selectedLoan && (
@@ -412,12 +343,12 @@ export default function Loans() {
               {[
                 { label: "Loan Amount",    value: formatCurrency(selectedLoan.amount) },
                 { label: "Outstanding",    value: formatCurrency(selectedLoan.balance) },
-                { label: "Term",           value: `${selectedLoan.term} months` },
-                { label: "Interest Rate",  value: `${selectedLoan.rate}% p.a.` },
-                { label: "Purpose",        value: selectedLoan.purpose },
+                { label: "Term",           value: selectedLoan.tenure ? `${selectedLoan.tenure} months` : "—" },
+                { label: "Interest Rate",  value: `${selectedLoan.interestRate ?? "—"}% p.a.` },
+                { label: "Purpose",        value: selectedLoan.purpose ?? "—" },
                 { label: "Status",         value: <Badge className={statusCfg[selectedLoan.status]?.cls} variant="outline">{statusCfg[selectedLoan.status]?.label}</Badge> },
-                { label: "Risk Score",     value: <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${riskColor(selectedLoan.riskScore)}`}>{selectedLoan.riskScore}</span> },
-                { label: "Penalties",      value: formatCurrency(selectedLoan.penalties) },
+                { label: "Monthly Payment",value: selectedLoan.monthlyPayment ? formatCurrency(selectedLoan.monthlyPayment) : "—" },
+                { label: "Due Date",       value: selectedLoan.dueDate ? new Date(selectedLoan.dueDate).toLocaleDateString("en-NG") : "—" },
               ].map(item => (
                 <div key={item.label} className="rounded-lg border p-3">
                   <div className="text-xs text-muted-foreground">{item.label}</div>
@@ -426,54 +357,7 @@ export default function Loans() {
               ))}
             </div>
 
-            {/* Guarantor */}
-            <Card className="border-dashed">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <HandshakeIcon className="h-5 w-5 text-purple-600" />
-                    <div>
-                      <div className="font-semibold text-sm">Guarantor: {selectedLoan.guarantorName}</div>
-                      <div className="text-xs text-muted-foreground">Guarantor verification status</div>
-                    </div>
-                  </div>
-                  {selectedLoan.guarantorVerified
-                    ? <Badge className="bg-emerald-100 text-emerald-800" variant="outline"><CheckCircle className="mr-1 h-3 w-3" /> Verified</Badge>
-                    : <Badge className="bg-red-100 text-red-800" variant="outline"><XCircle className="mr-1 h-3 w-3" /> Unverified</Badge>}
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Repayment Schedule */}
-            {selectedLoan.repayments.length > 0 && (
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Repayment Schedule</h4>
-                <div className="rounded-lg border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/40 text-xs font-semibold uppercase">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Month</th>
-                        <th className="px-4 py-2 text-right">Due</th>
-                        <th className="px-4 py-2 text-right">Paid</th>
-                        <th className="px-4 py-2 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {selectedLoan.repayments.map((r, i) => (
-                        <tr key={i} className="hover:bg-muted/20">
-                          <td className="px-4 py-2">{r.month}</td>
-                          <td className="px-4 py-2 text-right">{formatCurrency(r.due)}</td>
-                          <td className="px-4 py-2 text-right">{r.paid > 0 ? formatCurrency(r.paid) : "—"}</td>
-                          <td className="px-4 py-2 text-center">
-                            <Badge className={repaymentCls[r.status]} variant="outline">{r.status}</Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             {/* Quick actions */}
             <div className="flex flex-wrap gap-2 pt-2 border-t">
@@ -541,18 +425,18 @@ export default function Loans() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>New Term (months)</Label>
-                  <Input type="number" placeholder={String(actionDialog.loan?.term)} value={restructurePlan.months} onChange={e => setRestructurePlan(p => ({ ...p, months: e.target.value }))} />
+                  <Input type="number" placeholder={String(actionDialog.loan?.tenure ?? 12)} value={restructurePlan.months} onChange={e => setRestructurePlan(p => ({ ...p, months: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>New Rate (%)</Label>
-                  <Input type="number" placeholder={String(actionDialog.loan?.rate)} value={restructurePlan.rate} onChange={e => setRestructurePlan(p => ({ ...p, rate: e.target.value }))} />
+                  <Input type="number" placeholder={String(actionDialog.loan?.interestRate ?? 8)} value={restructurePlan.rate} onChange={e => setRestructurePlan(p => ({ ...p, rate: e.target.value }))} />
                 </div>
               </div>
             )}
 
             {actionDialog.action === "guarantor" && (
               <div className="rounded-lg bg-purple-50 border border-purple-200 p-3 text-sm text-purple-800">
-                This will notify guarantor <strong>{actionDialog.loan?.guarantorName}</strong> and initiate the recovery process. A formal demand notice will be generated.
+                This will initiate the guarantor recovery process for <strong>{actionDialog.loan?.memberName}</strong>. A formal demand notice will be generated.
               </div>
             )}
 
