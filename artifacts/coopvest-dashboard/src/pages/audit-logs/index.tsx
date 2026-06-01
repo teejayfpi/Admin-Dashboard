@@ -15,28 +15,6 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-// ── Mock comprehensive audit log entries ──────────────────────────────────────
-const MOCK_LOGS = [
-  { id: 101, action: "login",               actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "System",             description: "Admin login — Chrome / Lagos, Nigeria",                    timestamp: "2025-05-21T08:30:00Z", severity: "Info" },
-  { id: 102, action: "loan_approve",         actor: "t.adeyemi@coopvest.ng",    role: "Loan Officer",    target: "Loan #42 — Adaobi Nwoye", description: "Loan of ₦500,000 approved",                          timestamp: "2025-05-21T09:05:00Z", severity: "Info" },
-  { id: 103, action: "user_suspend",         actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Member CVA-00091",   description: "Account suspended — reason: fraud investigation",         timestamp: "2025-05-21T09:30:00Z", severity: "Warning" },
-  { id: 104, action: "balance_adjust",       actor: "a.mohammed@coopvest.ng",   role: "Finance Admin",   target: "Member CVA-00142",   description: "Balance adjusted by ₦25,000 — payroll discrepancy",       timestamp: "2025-05-21T10:00:00Z", severity: "Warning" },
-  { id: 105, action: "feature_toggle",       actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Mobile Feature: Loans", description: "Loan disbursement disabled for mobile",                timestamp: "2025-05-21T10:15:00Z", severity: "Warning" },
-  { id: 106, action: "loan_reject",          actor: "t.adeyemi@coopvest.ng",    role: "Loan Officer",    target: "Loan #44 — Emeka Obi", description: "Loan application rejected — insufficient risk score",     timestamp: "2025-05-21T10:45:00Z", severity: "Info" },
-  { id: 107, action: "account_change",       actor: "a.mohammed@coopvest.ng",   role: "Finance Admin",   target: "Member CVA-00217",   description: "Contribution method changed: Manual → Payroll Deduction",  timestamp: "2025-05-21T11:00:00Z", severity: "Info" },
-  { id: 108, action: "kyc_approve",          actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Member CVA-00300",   description: "KYC verification approved — ID and selfie verified",       timestamp: "2025-05-21T11:30:00Z", severity: "Info" },
-  { id: 109, action: "payment_reverse",      actor: "a.mohammed@coopvest.ng",   role: "Finance Admin",   target: "Transaction TXN-9821", description: "Transaction reversed — duplicate deduction detected",     timestamp: "2025-05-21T12:00:00Z", severity: "Warning" },
-  { id: 110, action: "login_failed",         actor: "unknown@external.com",     role: "—",               target: "System",             description: "Failed login attempt from 45.88.107.22 (Russia)",         timestamp: "2025-05-20T14:22:00Z", severity: "Critical" },
-  { id: 111, action: "staff_create",         actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "New Staff: n.okeke@coopvest.ng", description: "Staff account created — Role: Customer Support", timestamp: "2025-05-20T11:00:00Z", severity: "Info" },
-  { id: 112, action: "role_change",          actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Staff: t.adeyemi@coopvest.ng", description: "Role changed: Finance Admin → Loan Officer",      timestamp: "2025-05-19T15:30:00Z", severity: "Warning" },
-  { id: 113, action: "settings_update",      actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Security Settings",  description: "Session timeout changed: 30min → 60min",                  timestamp: "2025-05-19T14:00:00Z", severity: "Info" },
-  { id: 114, action: "loan_penalty",         actor: "t.adeyemi@coopvest.ng",    role: "Loan Officer",    target: "Loan #38 — Babatunde Salami", description: "Penalty of ₦15,000 added — 3 missed payments",    timestamp: "2025-05-19T10:00:00Z", severity: "Warning" },
-  { id: 115, action: "loan_restructure",     actor: "t.adeyemi@coopvest.ng",    role: "Loan Officer",    target: "Loan #38 — Babatunde Salami", description: "Repayment restructured: 18mo → 24mo at 9%",        timestamp: "2025-05-18T16:00:00Z", severity: "Info" },
-  { id: 116, action: "ip_block",             actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "IP: 185.220.101.45", description: "IP address blocked — suspicious foreign login attempt",    timestamp: "2025-05-18T09:00:00Z", severity: "Warning" },
-  { id: 117, action: "logout",              actor: "a.mohammed@coopvest.ng",    role: "Finance Admin",   target: "System",             description: "Admin logout",                                              timestamp: "2025-05-17T17:30:00Z", severity: "Info" },
-  { id: 118, action: "org_onboard",          actor: "c.obi@coopvest.ng",        role: "Super Admin",     target: "Org: Federal University, Akure", description: "New organization onboarded",                  timestamp: "2025-05-16T10:00:00Z", severity: "Info" },
-];
-
 const actionConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   login:           { label: "Login",               icon: LogIn,         color: "text-emerald-600 bg-emerald-50" },
   logout:          { label: "Logout",              icon: LogOut,        color: "text-gray-600 bg-gray-100" },
@@ -77,6 +55,18 @@ const TRACKED_ACTIONS = [
   { label: "Security Events",         value: "ip_block" },
 ];
 
+type ApiLog = {
+  id: number | string;
+  action: string;
+  actor: string;
+  role?: string;
+  target?: string;
+  description?: string;
+  timestamp: string;
+  severity?: string;
+  [key: string]: unknown;
+};
+
 export default function AuditLogs() {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
@@ -86,27 +76,28 @@ export default function AuditLogs() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
 
-  // Also fetch from API
-  const { data: apiData, isLoading: apiLoading } = useGetAuditLogs({ page: 1, limit: 5 });
+  const { data: apiData, isLoading: apiLoading } = useGetAuditLogs({ page, limit: PAGE_SIZE });
 
-  const filtered = MOCK_LOGS.filter(log => {
+  const allLogs: ApiLog[] = (apiData as { data?: ApiLog[] } | undefined)?.data ?? [];
+  const total = (apiData as { total?: number } | undefined)?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const filtered = allLogs.filter(log => {
     const matchSearch = !search ||
-      log.actor.toLowerCase().includes(search.toLowerCase()) ||
-      log.description.toLowerCase().includes(search.toLowerCase()) ||
-      log.target.toLowerCase().includes(search.toLowerCase());
+      log.actor?.toLowerCase().includes(search.toLowerCase()) ||
+      log.description?.toLowerCase().includes(search.toLowerCase()) ||
+      log.target?.toLowerCase().includes(search.toLowerCase());
     const matchAction   = actionFilter === "all" || log.action === actionFilter;
     const matchSeverity = severityFilter === "all" || log.severity === severityFilter;
     const matchRole     = roleFilter === "all" || log.role === roleFilter;
     return matchSearch && matchAction && matchSeverity && matchRole;
   });
 
-  const total = filtered.length;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated = filtered;
 
   function exportCSV() {
     const headers = ["ID", "Action", "Actor", "Role", "Target", "Description", "Timestamp", "Severity"];
-    const rows = filtered.map(l => [l.id, l.action, l.actor, l.role, `"${l.target}"`, `"${l.description}"`, l.timestamp, l.severity]);
+    const rows = filtered.map(l => [l.id, l.action, l.actor, l.role ?? "", '"' + (l.target ?? "") + '"', '"' + (l.description ?? "") + '"', l.timestamp, l.severity ?? ""]);
     const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -130,10 +121,10 @@ export default function AuditLogs() {
         {/* Stats Row */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: "Total Events", value: MOCK_LOGS.length, color: "text-primary" },
-            { label: "Critical", value: MOCK_LOGS.filter(l => l.severity === "Critical").length, color: "text-red-600" },
-            { label: "Warnings", value: MOCK_LOGS.filter(l => l.severity === "Warning").length, color: "text-amber-600" },
-            { label: "Actions Today", value: MOCK_LOGS.filter(l => l.timestamp.startsWith("2025-05-21")).length, color: "text-emerald-600" },
+            { label: "Total Events", value: total, color: "text-primary" },
+            { label: "Critical", value: allLogs.filter(l => l.severity === "Critical").length, color: "text-red-600" },
+            { label: "Warnings", value: allLogs.filter(l => l.severity === "Warning").length, color: "text-amber-600" },
+            { label: "Actions Today", value: allLogs.filter(l => l.timestamp?.startsWith(new Date().toISOString().slice(0,10))).length, color: "text-emerald-600" },
           ].map(s => (
             <Card key={s.label}>
               <CardContent className="p-4">
