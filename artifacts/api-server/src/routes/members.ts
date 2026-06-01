@@ -1,13 +1,49 @@
 import { Router, type IRouter } from "express";
 import { supabase, splitName, deriveStatus } from "@workspace/db";
-// Fix #2: Import generated Zod schemas for input validation
 import { CreateMemberBody } from "@workspace/api-zod";
-import { requireAuth, requireRole } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 router.use(requireAuth);
 
+// Auto-sync Supabase Auth users → profiles so mobile registrations appear in admin
+async function syncAuthUsersToProfiles(): Promise<void> {
+  try {
+    const { data, error } = await (supabase.auth.admin as any).listUsers({ perPage: 1000 });
+    if (error || !data?.users?.length) return;
+
+    const { data: existing } = await supabase.from("profiles").select("email");
+    const knownEmails = new Set(
+      (existing ?? []).map((p: any) => ((p.email as string) ?? "").toLowerCase())
+    );
+
+    const toInsert = (data.users as any[])
+      .filter(u => u.email && !knownEmails.has(u.email.toLowerCase()))
+      .map(u => ({
+        id: crypto.randomUUID(),
+        user_id: "CVA-" + u.id.replace(/-/g, "").slice(0, 8).toUpperCase(),
+        name:
+          u.user_metadata?.full_name ??
+          u.user_metadata?.name ??
+          u.email.split("@")[0],
+        email: u.email,
+        phone: (u.phone ?? u.user_metadata?.phone) || null,
+        role: "member",
+        is_active: true,
+        kyc_verified: false,
+        created_at: u.created_at ?? new Date().toISOString(),
+      }));
+
+    if (toInsert.length > 0) {
+      await supabase.from("profiles").insert(toInsert);
+    }
+  } catch {
+    // best-effort — never crash the route
+  }
+}
+
 router.get("/members/stats", async (req, res): Promise<void> => {
+  await syncAuthUsersToProfiles();
   const { count: total }     = await supabase.from("profiles").select("*", { count: "exact", head: true });
   const { count: active }    = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_active", true).eq("kyc_verified", true).eq("is_flagged", false);
   const { count: inactive }  = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_active", false);
@@ -20,6 +56,8 @@ router.get("/members/stats", async (req, res): Promise<void> => {
 });
 
 router.get("/members", async (req, res): Promise<void> => {
+  await syncAuthUsersToProfiles();
+
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Number(req.query.limit) || 20);
   const offset = (page - 1) * limit;
@@ -52,7 +90,6 @@ router.get("/members", async (req, res): Promise<void> => {
   });
 });
 
-// Fix #2: Validate POST body with Zod before inserting
 router.post("/members", async (req, res): Promise<void> => {
   const parsed = CreateMemberBody.safeParse(req.body);
   if (!parsed.success) {
@@ -77,28 +114,6 @@ router.get("/members/:id", async (req, res): Promise<void> => {
   const activeLoan = (activeLoans ?? []).reduce((sum, l) => sum + Number(l.remaining_balance || 0), 0);
   const { firstName, lastName } = splitName(profile.name);
   res.json({ id: profile.id, memberId: profile.user_id, firstName, lastName, email: profile.email, phone: profile.phone ?? "", status: deriveStatus(profile), joinDate: profile.created_at?.slice(0, 10) ?? null, address: null, occupation: null, createdAt: profile.created_at, totalContributions, activeLoan, riskScore: 0, avatarInitials: ((firstName[0] ?? "") + (lastName[0] ?? "")).toUpperCase() || "??" });
-});
-
-// Fix #4: Updating a member requires at minimum "operator" role
-router.put("/members/:id", requireRole("operator"), async (req, res): Promise<void> => {
-  const id = req.params.id;
-  const { firstName, lastName, email, phone, status } = req.body;
-  const updates: Record<string, unknown> = {};
-  if (firstName || lastName) {
-    const { data: existing } = await supabase.from("profiles").select("name").eq("id", id).single();
-    const current = splitName(existing?.name ?? "");
-    updates.name = `${firstName ?? current.firstName} ${lastName ?? current.lastName}`;
-  }
-  if (email) updates.email = email;
-  if (phone) updates.phone = phone;
-  if (status === "active")         { updates.is_active = true;  updates.kyc_verified = true;  updates.is_flagged = false; }
-  else if (status === "inactive")  { updates.is_active = false; }
-  else if (status === "suspended") { updates.is_flagged = true; }
-  else if (status === "pending")   { updates.is_active = true; updates.kyc_verified = false; updates.is_flagged = false; }
-  const { data: profile, error } = await supabase.from("profiles").update(updates).eq("id", id).select().single();
-  if (error || !profile) { res.status(404).json({ error: "Member not found" }); return; }
-  const { firstName: fn, lastName: ln } = splitName(profile.name);
-  res.json({ id: profile.id, memberId: profile.user_id, firstName: fn, lastName: ln, email: profile.email, phone: profile.phone ?? "", status: deriveStatus(profile), joinDate: profile.created_at?.slice(0, 10) ?? null, address: null, occupation: null, createdAt: profile.created_at, totalContributions: 0, activeLoan: 0, riskScore: 0 });
 });
 
 export default router;
