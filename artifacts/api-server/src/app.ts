@@ -65,4 +65,10 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+// Catch-all 404 handler
+app.use((req, res) => {
+  logger.info({ path: req.path }, "Unhandled route");
+  res.status(404).json({ success: false, error: "Endpoint not found", path: req.path });
+});
+
 export default app;
