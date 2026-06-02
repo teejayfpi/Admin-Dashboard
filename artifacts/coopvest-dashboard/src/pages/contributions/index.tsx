@@ -181,7 +181,7 @@ export default function Contributions() {
                 <CardContent className="p-0">
                   {isLoading ? (
                     <div className="p-6 space-y-3">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                  ) : !data?.contributions?.length ? (
+                  ) : !data?.data?.length ? (
                     <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
                       <Wallet className="h-8 w-8 opacity-40" />
                       <p>No contributions found.</p>
@@ -201,14 +201,14 @@ export default function Contributions() {
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {data.contributions
-                            .filter(c => {
+                          {data.data
+                            .filter((c) => {
                               if (tab === "pending") return c.status === "pending";
                               if (tab === "missed") return c.status === "overdue";
                               return true;
                             })
-                            .filter(c => !search || c.memberName?.toLowerCase().includes(search.toLowerCase()))
-                            .map(c => (
+                            .filter((c) => !search || c.memberName?.toLowerCase().includes(search.toLowerCase()))
+                            .map((c) => (
                               <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3 font-medium">{c.memberName ?? `Member #${c.memberId}`}</td>
                                 <td className="px-4 py-3 text-muted-foreground">{c.month}</td>
@@ -218,7 +218,7 @@ export default function Contributions() {
                                   <Badge className={statusColors[c.status] ?? ""} variant="outline">{c.status}</Badge>
                                 </td>
                                 <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                                  {c.date ? new Date(c.date).toLocaleDateString("en-NG") : "—"}
+                                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-NG") : "—"}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <div className="flex justify-center gap-1">
@@ -267,7 +267,7 @@ export default function Contributions() {
                 <CardHeader><CardTitle className="text-base">Monthly Contribution Growth</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={250}>
-                    <AreaChart data={(trendsData?.data ?? []).map((t: { month: string; amount: number }) => ({ month: t.month, collected: t.amount, missed: 0 }))}>
+                    <AreaChart data={(trendsData ?? []).map((t) => ({ month: t.month, collected: t.value, missed: 0 }))}>
                       <defs>
                         <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#2d6a4f" stopOpacity={0.3} />
@@ -288,7 +288,7 @@ export default function Contributions() {
                 <CardHeader><CardTitle className="text-base">Collected vs Missed</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={(trendsData?.data ?? []).map((t: { month: string; amount: number }) => ({ month: t.month, collected: t.amount, missed: 0 }))}>
+                    <BarChart data={(trendsData ?? []).map((t) => ({ month: t.month, collected: t.value, missed: 0 }))}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                       <YAxis tickFormatter={(v) => `₦${(v / 1000000).toFixed(0)}M`} tick={{ fontSize: 11 }} />
@@ -316,7 +316,7 @@ export default function Contributions() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {((trendsData?.data ?? []).map((t: { month: string; amount: number }) => ({ month: t.month, collected: t.amount, missed: 0 }))).map(t => {
+                    {((trendsData ?? []).map((t) => ({ month: t.month, collected: t.value, missed: 0 }))).map((t: { month: string; collected: number; missed: number }) => {
                       const rate = ((t.collected / (t.collected + t.missed)) * 100).toFixed(1);
                       return (
                         <tr key={t.month} className="hover:bg-muted/30">

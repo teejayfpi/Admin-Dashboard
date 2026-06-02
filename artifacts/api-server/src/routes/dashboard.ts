@@ -27,9 +27,13 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const { count: pendingKyc }  = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "pending");
   const { count: openTickets } = await supabase.from("tickets").select("*", { count: "exact", head: true }).in("status", ["open", "in_progress"]);
 
-  const orgResult = await supabase.from("organizations").select("*", { count: "exact", head: true }).eq("status", "active")
-    .catch(() => ({ count: 0 }));
-  const activeOrganizations = (orgResult as unknown as { count: number }).count ?? 0;
+  let activeOrganizations = 0;
+  try {
+    const { count } = await supabase.from("organizations").select("*", { count: "exact", head: true }).eq("status", "active");
+    activeOrganizations = count ?? 0;
+  } catch {
+    activeOrganizations = 0;
+  }
 
   res.json({
     totalMembers:        memberCount        ?? 0,

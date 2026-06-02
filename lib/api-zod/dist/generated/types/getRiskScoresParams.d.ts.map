@@ -1,0 +1,1 @@
+{"version":3,"file":"getRiskScoresParams.d.ts","sourceRoot":"","sources":["../../../src/generated/types/getRiskScoresParams.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,0BAA0B,CAAC;AAEvE,MAAM,MAAM,mBAAmB,GAAG;IAClC,SAAS,CAAC,EAAE,sBAAsB,CAAC;IACnC,IAAI,CAAC,EAAE,MAAM,CAAC;IACd,KAAK,CAAC,EAAE,MAAM,CAAC;CACd,CAAC"}

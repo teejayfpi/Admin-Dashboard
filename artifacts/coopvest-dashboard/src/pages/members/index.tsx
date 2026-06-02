@@ -121,10 +121,10 @@ export default function Members() {
   }
 
   function exportCSV() {
-    const rows = data?.members ?? [];
+    const rows = data?.data ?? [];
     if (!rows.length) return;
     const headers = ["ID", "Name", "Email", "Phone", "Status", "Organization", "Monthly Contribution", "Risk Score"];
-    const csv = [headers.join(","), ...rows.map(m => [m.id, `"${m.name}"`, m.email, m.phone ?? "", m.status, `"${m.organization ?? ""}"`, m.monthlyContribution ?? "", m.riskScore ?? ""].join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map((m) => [m.id, `"${m.firstName} ${m.lastName}"`, m.email, m.phone ?? "", m.status, `"${m.occupation ?? ""}"`, m.totalContributions ?? "", m.riskScore ?? ""].join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "members_export.csv"; a.click();
@@ -217,7 +217,7 @@ export default function Members() {
                   <div className="space-y-3 p-6">
                     {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
                   </div>
-                ) : !data?.members?.length ? (
+                ) : !data?.data?.length ? (
                   <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
                     <Users className="h-8 w-8 opacity-40" />
                     <p>No members found.</p>
@@ -237,13 +237,13 @@ export default function Members() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {data.members.map((member) => (
+                        {data.data.map((member) => (
                           <tr key={member.id} className="group hover:bg-muted/30 transition-colors">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9">
                                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                                    {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                    {`${member.firstName} ${member.lastName}`.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
@@ -252,20 +252,20 @@ export default function Members() {
                                     onClick={() => setLocation(`/members/${member.id}`)}
                                     data-testid={`member-link-${member.id}`}
                                   >
-                                    {member.name}
+                                    {member.firstName} {member.lastName}
                                   </button>
                                   <div className="text-xs text-muted-foreground">{member.email}</div>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-muted-foreground">{member.organization ?? "—"}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{member.occupation ?? "—"}</td>
                             <td className="px-4 py-3">
                               <Badge className={statusColors[member.status] ?? ""} variant="outline">
                                 {member.status}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
-                              {formatCurrency(member.monthlyContribution ?? 0)}
+                              {formatCurrency(member.totalContributions ?? 0)}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${
@@ -292,37 +292,37 @@ export default function Members() {
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   {member.status !== "active" && (
-                                    <DropdownMenuItem onClick={() => openAction(member.id, "activate", member.name)}>
+                                    <DropdownMenuItem onClick={() => openAction(member.id, "activate", `${member.firstName} ${member.lastName}`)}>
                                       <UserCheck className="mr-2 h-4 w-4 text-emerald-600" /> Activate Account
                                     </DropdownMenuItem>
                                   )}
                                   {member.status === "active" && (
-                                    <DropdownMenuItem onClick={() => openAction(member.id, "suspend", member.name)} className="text-orange-600">
+                                    <DropdownMenuItem onClick={() => openAction(member.id, "suspend", `${member.firstName} ${member.lastName}`)} className="text-orange-600">
                                       <Ban className="mr-2 h-4 w-4" /> Suspend Account
                                     </DropdownMenuItem>
                                   )}
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "freeze", member.name)} className="text-blue-600">
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "freeze", `${member.firstName} ${member.lastName}`)} className="text-blue-600">
                                     <Lock className="mr-2 h-4 w-4" /> Freeze Account
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "reset_password", member.name)}>
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "reset_password", `${member.firstName} ${member.lastName}`)}>
                                     <KeyRound className="mr-2 h-4 w-4" /> Reset Password
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "verify", member.name)}>
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "verify", `${member.firstName} ${member.lastName}`)}>
                                     <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Verify User
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "restrict_loans", member.name)} className="text-red-600">
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "restrict_loans", `${member.firstName} ${member.lastName}`)} className="text-red-600">
                                     <CreditCard className="mr-2 h-4 w-4" /> Restrict Loans
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "change_contribution", member.name)}>
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "change_contribution", `${member.firstName} ${member.lastName}`)}>
                                     <ArrowUpDown className="mr-2 h-4 w-4" /> Change Contribution Method
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "upgrade", member.name)}>
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "upgrade", `${member.firstName} ${member.lastName}`)}>
                                     Upgrade Account
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openAction(member.id, "downgrade", member.name)}>
+                                  <DropdownMenuItem onClick={() => openAction(member.id, "downgrade", `${member.firstName} ${member.lastName}`)}>
                                     Downgrade Account
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>

@@ -1,0 +1,1 @@
+{"version":3,"file":"supportTicketsListResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/types/supportTicketsListResponse.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAErD,MAAM,WAAW,0BAA0B;IACzC,IAAI,EAAE,aAAa,EAAE,CAAC;IACtB,KAAK,EAAE,MAAM,CAAC;IACd,IAAI,EAAE,MAAM,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;CACf"}

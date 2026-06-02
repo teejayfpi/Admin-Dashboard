@@ -87,11 +87,11 @@ export default function Dashboard() {
     { title: "Active Defaulters",     value: summary?.activeDefaulters ?? 0,                                      icon: UserX,      format: "number"   as const, accent: "amber" as const },
   ];
 
-  const pieData  = (loanBreakdown?.breakdown ?? []).map((b: { status: string; count: number }) => ({
+  const pieData  = (loanBreakdown ?? []).map((b) => ({
     name: b.status.charAt(0).toUpperCase() + b.status.slice(1), value: b.count,
   }));
-  const areaData = (monthlyData?.data ?? []).map((d: { month: string; amount: number }) => ({
-    month: d.month, contributions: d.amount,
+  const areaData = (monthlyData ?? []).map((d) => ({
+    month: d.month, contributions: d.value,
   }));
 
   return (
@@ -234,16 +234,13 @@ export default function Dashboard() {
             <CardContent>
               {loadingActivity ? (
                 <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-              ) : (recentActivity?.activities ?? []).length === 0 ? (
+              ) : (recentActivity ?? []).length === 0 ? (
                 <div className="flex flex-col items-center py-12 gap-3 text-muted-foreground">
                   <Activity className="h-12 w-12 opacity-30" /><p>No recent activity</p>
                 </div>
               ) : (
                 <div className="space-y-1 divide-y">
-                  {(recentActivity?.activities ?? []).slice(0, 8).map((item: {
-                    id: number; type: string; description: string;
-                    amount: number | null; createdAt: string;
-                  }) => (
+                  {(recentActivity ?? []).slice(0, 8).map((item) => (
                     <div key={item.id} className="flex items-center gap-4 py-3" data-testid={`activity-item-${item.id}`}>
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
                         {item.type === "contribution"
