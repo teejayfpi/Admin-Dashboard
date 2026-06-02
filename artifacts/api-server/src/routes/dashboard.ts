@@ -3,28 +3,46 @@ import { supabase, splitName } from "@workspace/db";
 
 const router: IRouter = Router();
 
+// Helper to calculate percentage growth between two values
+function calcGrowth(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+// Helper to get date range for previous period
+function getPreviousPeriod(periodStart: Date, months: number): { start: Date; end: Date } {
+  const start = new Date(periodStart);
+  start.setMonth(start.getMonth() - months);
+  const end = new Date(periodStart);
+  end.setDate(end.getDate() - 1);
+  return { start, end };
+}
+
 router.get("/dashboard/summary", async (req, res): Promise<void> => {
+  // Get current counts
   const { count: memberCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-  const { data: loanRows }     = await supabase.from("loans").select("amount, remaining_balance, status");
+  const { count: activeMembersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
+    .eq("is_active", true).eq("kyc_verified", true).eq("is_flagged", false);
+  const { data: loanRows } = await supabase.from("loans").select("amount, remaining_balance, status");
   const loans = loanRows ?? [];
 
-  const activeLoans      = loans.filter((l) => l.status === "active").length;
-  const completedCount   = loans.filter((l) => l.status === "completed").length;
-  const defaultedLoans   = loans.filter((l) => l.status === "defaulted" || l.status === "overdue");
-  const riskExposure     = defaultedLoans.reduce((s, l) => s + Number(l.remaining_balance || l.amount || 0), 0);
+  const activeLoans = loans.filter((l) => l.status === "active").length;
+  const completedCount = loans.filter((l) => l.status === "completed").length;
+  const defaultedLoans = loans.filter((l) => l.status === "defaulted" || l.status === "overdue");
+  const riskExposure = defaultedLoans.reduce((s, l) => s + Number(l.remaining_balance || l.amount || 0), 0);
   const activeDefaulters = defaultedLoans.length;
-  const totalLoans       = activeLoans + completedCount;
-  const repaymentRate    = totalLoans > 0 ? (completedCount / totalLoans) * 100 : 0;
-  const loansDisbursed   = loans.filter((l) => l.status === "active" || l.status === "completed")
+  const totalLoans = activeLoans + completedCount;
+  const repaymentRate = totalLoans > 0 ? (completedCount / totalLoans) * 100 : 0;
+  const loansDisbursed = loans.filter((l) => l.status === "active" || l.status === "completed")
     .reduce((s, l) => s + Number(l.amount || 0), 0);
 
-  const { data: savingsRows }  = await supabase.from("savings").select("total_saved");
-  const totalContributions     = (savingsRows ?? []).reduce((s, r) => s + Number(r.total_saved || 0), 0);
+  const { data: savingsRows } = await supabase.from("savings").select("total_saved");
+  const totalContributions = (savingsRows ?? []).reduce((s, r) => s + Number(r.total_saved || 0), 0);
 
-  const { data: poolRows }     = await supabase.from("investment_pools").select("raised_amount");
-  const totalInvestments       = (poolRows ?? []).reduce((s, r) => s + Number(r.raised_amount || 0), 0);
+  const { data: poolRows } = await supabase.from("investment_pools").select("raised_amount");
+  const totalInvestments = (poolRows ?? []).reduce((s, r) => s + Number(r.raised_amount || 0), 0);
 
-  const { count: pendingKyc }  = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "pending");
+  const { count: pendingKyc } = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "pending");
   const { count: openTickets } = await supabase.from("tickets").select("*", { count: "exact", head: true }).in("status", ["open", "in_progress"]);
 
   let activeOrganizations = 0;
@@ -35,26 +53,68 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     activeOrganizations = 0;
   }
 
+  // Calculate growth metrics from historical data
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
+
+  // Members growth (comparing this month vs last month new members)
+  const { count: newThisMonth } = await supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", monthStart);
+  const { count: newLastMonth } = await supabase.from("profiles").select("*", { count: "exact", head: true })
+    .gte("created_at", prevMonthStart).lt("created_at", prevMonthEnd);
+  const membersGrowth = calcGrowth(newThisMonth ?? 0, newLastMonth ?? 0);
+
+  // Savings growth (comparing totals this month vs last month)
+  const { data: savingsThisMonth } = await supabase.from("savings").select("total_saved").gte("updated_at", monthStart);
+  const { data: savingsLastMonth } = await supabase.from("savings").select("total_saved")
+    .gte("updated_at", prevMonthStart).lt("updated_at", prevMonthEnd);
+  const savingsThisMonthTotal = (savingsThisMonth ?? []).reduce((s, r) => s + Number(r.total_saved || 0), 0);
+  const savingsLastMonthTotal = (savingsLastMonth ?? []).reduce((s, r) => s + Number(r.total_saved || 0), 0);
+  const savingsGrowth = calcGrowth(savingsThisMonthTotal, savingsLastMonthTotal);
+
+  // Loans growth (comparing approvals this month vs last month)
+  const { count: loansThisMonth } = await supabase.from("loans").select("*", { count: "exact", head: true })
+    .in("status", ["active", "completed"]).gte("approved_at", monthStart);
+  const { count: loansLastMonth } = await supabase.from("loans").select("*", { count: "exact", head: true })
+    .in("status", ["active", "completed"]).gte("approved_at", prevMonthStart).lt("approved_at", prevMonthEnd);
+  const loansGrowth = calcGrowth(loansThisMonth ?? 0, loansLastMonth ?? 0);
+
+  // Contributions growth (monthly savings volume)
+  const { data: txnsThisMonth } = await supabase.from("transactions").select("amount")
+    .in("type", ["savings_deposit", "deposit"]).eq("status", "completed").gte("created_at", monthStart);
+  const { data: txnsLastMonth } = await supabase.from("transactions").select("amount")
+    .in("type", ["savings_deposit", "deposit"]).eq("status", "completed").gte("created_at", prevMonthStart).lt("created_at", prevMonthEnd);
+  const contributionsThisMonth = (txnsThisMonth ?? []).reduce((s, t) => s + Number(t.amount || 0), 0);
+  const contributionsLastMonth = (txnsLastMonth ?? []).reduce((s, t) => s + Number(t.amount || 0), 0);
+  const contributionsGrowth = calcGrowth(contributionsThisMonth, contributionsLastMonth);
+
+  // Monthly growth (overall platform activity based on transactions)
+  const { count: txnsCountThisMonth } = await supabase.from("transactions").select("*", { count: "exact", head: true }).gte("created_at", monthStart);
+  const { count: txnsCountLastMonth } = await supabase.from("transactions").select("*", { count: "exact", head: true })
+    .gte("created_at", prevMonthStart).lt("created_at", prevMonthEnd);
+  const monthlyGrowth = calcGrowth(txnsCountThisMonth ?? 0, txnsCountLastMonth ?? 0);
+
   res.json({
-    totalMembers:        memberCount        ?? 0,
-    activeMembers:       memberCount        ?? 0,
+    totalMembers: memberCount ?? 0,
+    activeMembers: activeMembersCount ?? 0,
     activeLoans,
     totalContributions,
-    totalSavings:        totalContributions,
+    totalSavings: totalContributions,
     loansDisbursed,
-    totalLoansIssued:    loansDisbursed,
-    repaymentRate:       Math.round(repaymentRate * 10) / 10,
-    pendingCompliance:   pendingKyc         ?? 0,
-    openSupportTickets:  openTickets        ?? 0,
+    totalLoansIssued: loansDisbursed,
+    repaymentRate: Math.round(repaymentRate * 10) / 10,
+    pendingCompliance: pendingKyc ?? 0,
+    openSupportTickets: openTickets ?? 0,
     totalInvestments,
     riskExposure,
     activeDefaulters,
     activeOrganizations,
-    monthlyGrowth:       4.2,
-    membersGrowth:       8.5,
-    loansGrowth:         12.3,
-    savingsGrowth:       6.7,
-    contributionsGrowth: 6.7,
+    monthlyGrowth,
+    membersGrowth,
+    loansGrowth,
+    savingsGrowth,
+    contributionsGrowth,
   });
 });
 

@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
 import { supabase } from "@workspace/db";
 import { z } from "zod";
+import { requireAuth, requireRole } from "../middleware/auth";
 
 const router: IRouter = Router();
+router.use(requireAuth);
 
 const CreateInvestmentBody = z.object({
   name: z.string().min(1, "name is required"),
@@ -13,7 +15,7 @@ const CreateInvestmentBody = z.object({
   description: z.string().optional(),
 });
 
-router.get("/investments/portfolio", async (req, res): Promise<void> => {
+router.get("/investments/portfolio", requireRole("viewer", "operator", "admin", "super_admin"), async (req, res): Promise<void> => {
   const { data: pools } = await supabase.from("investment_pools").select("*");
   const rows = pools ?? [];
 

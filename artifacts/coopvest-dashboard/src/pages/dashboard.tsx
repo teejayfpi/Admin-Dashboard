@@ -20,13 +20,10 @@ import {
 import { useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { getAccessToken } from "@/lib/supabase";
 
 const PIE_COLORS = ["#2d6a4f", "#40916c", "#f6ae2d", "#e63946", "#74c69d"];
-
-// Fix #3: Removed static mock arrays. Charts below show placeholder banners
-// until the corresponding API endpoints are implemented.
-const CHART_PLACEHOLDER_NOTICE =
-  "⚠️ This chart shows placeholder data. Wire up the API endpoint to display live figures.";
 
 function KPICard({
   title, value, growth, icon: Icon, loading,
@@ -69,25 +66,79 @@ function KPICard({
   );
 }
 
+interface AnalyticsData {
+  repaymentTrend: { month: string; rate: number }[];
+  riskExposure: { month: string; exposure: number }[];
+  defaulterTrend: { month: string; count: number; rate: number }[];
+}
+
+// Fetch analytics data from the API
+async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
+  try {
+    const token = await getAccessToken();
+    if (!token) return null;
+
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const headers = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+
+    const [repaymentRes, riskRes, defaulterRes] = await Promise.all([
+      fetch(`${apiUrl}/api/analytics/repayment-trend`, { headers }),
+      fetch(`${apiUrl}/api/analytics/risk-exposure`, { headers }),
+      fetch(`${apiUrl}/api/analytics/defaulter-trend`, { headers }),
+    ]);
+
+    if (!repaymentRes.ok || !riskRes.ok || !defaulterRes.ok) return null;
+
+    const [repaymentData, riskData, defaulterData] = await Promise.all([
+      repaymentRes.json(),
+      riskRes.json(),
+      defaulterRes.json(),
+    ]);
+
+    return {
+      repaymentTrend: repaymentData.trends || [],
+      riskExposure: riskData.exposures || [],
+      defaulterTrend: defaulterData.trends || [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { data: summary,        isLoading: loadingSummary  } = useGetDashboardSummary();
-  const { data: monthlyData,    isLoading: loadingMonthly  } = useGetMonthlyContributions();
-  const { data: loanBreakdown,  isLoading: loadingLoans    } = useGetLoanStatusBreakdown();
+  const { data: summary, isLoading: loadingSummary, refetch: refetchSummary } = useGetDashboardSummary();
+  const { data: monthlyData, isLoading: loadingMonthly } = useGetMonthlyContributions();
+  const { data: loanBreakdown, isLoading: loadingLoans } = useGetLoanStatusBreakdown();
   const { data: recentActivity, isLoading: loadingActivity } = useGetRecentActivity();
 
+  // Real-time analytics data
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+
+  // Fetch analytics on mount
+  useEffect(() => {
+    async function loadAnalytics() {
+      setLoadingAnalytics(true);
+      const data = await fetchAnalyticsData();
+      setAnalyticsData(data);
+      setLoadingAnalytics(false);
+    }
+    loadAnalytics();
+  }, []);
+
   const kpiCards = [
-    { title: "Total Savings Volume",  value: summary?.totalSavings    ?? 0, growth: summary?.savingsGrowth ?? 0, icon: Wallet,     format: "currency" as const },
-    { title: "Total Loans Issued",    value: summary?.totalLoansIssued ?? 0, growth: summary?.loansGrowth   ?? 0, icon: CreditCard, format: "currency" as const },
-    { title: "Active Members",        value: summary?.activeMembers   ?? 0, growth: summary?.membersGrowth ?? 0, icon: Users,      format: "number"   as const },
-    { title: "Active Organizations",  value: summary?.activeOrganizations ?? 0,                                   icon: Building2,  format: "number"   as const },
-    { title: "Repayment Rate",        value: summary?.repaymentRate   ?? 0, growth: 2,                            icon: Percent,    format: "percent"  as const },
-    { title: "Monthly Growth",        value: summary?.monthlyGrowth   ?? 0, growth: summary?.monthlyGrowth,       icon: TrendingUp, format: "percent"  as const },
-    { title: "Risk Exposure",         value: summary?.riskExposure    ?? 0,                                       icon: ShieldAlert,format: "currency" as const, accent: "red"   as const },
-    { title: "Active Defaulters",     value: summary?.activeDefaulters ?? 0,                                      icon: UserX,      format: "number"   as const, accent: "amber" as const },
+    { title: "Total Savings Volume", value: summary?.totalSavings ?? 0, growth: summary?.savingsGrowth ?? 0, icon: Wallet, format: "currency" as const },
+    { title: "Total Loans Issued", value: summary?.totalLoansIssued ?? 0, growth: summary?.loansGrowth ?? 0, icon: CreditCard, format: "currency" as const },
+    { title: "Active Members", value: summary?.activeMembers ?? 0, growth: summary?.membersGrowth ?? 0, icon: Users, format: "number" as const },
+    { title: "Active Organizations", value: summary?.activeOrganizations ?? 0, icon: Building2, format: "number" as const },
+    { title: "Repayment Rate", value: summary?.repaymentRate ?? 0, growth: 0, icon: Percent, format: "percent" as const },
+    { title: "Monthly Growth", value: summary?.monthlyGrowth ?? 0, growth: summary?.monthlyGrowth ?? 0, icon: TrendingUp, format: "percent" as const },
+    { title: "Risk Exposure", value: summary?.riskExposure ?? 0, icon: ShieldAlert, format: "currency" as const, accent: "red" as const },
+    { title: "Active Defaulters", value: summary?.activeDefaulters ?? 0, icon: UserX, format: "number" as const, accent: "amber" as const },
   ];
 
-  const pieData  = (loanBreakdown ?? []).map((b) => ({
+  const pieData = (loanBreakdown ?? []).map((b) => ({
     name: b.status.charAt(0).toUpperCase() + b.status.slice(1), value: b.count,
   }));
   const areaData = (monthlyData ?? []).map((d) => ({
@@ -104,7 +155,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight">Command Center</h1>
             <p className="text-muted-foreground mt-1">Coopvest Africa — Real-time platform overview</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Button variant="outline" size="sm" onClick={() => refetchSummary()}>
             <RefreshCw className="h-4 w-4 mr-2" />Refresh
           </Button>
         </div>
@@ -170,30 +221,63 @@ export default function Dashboard() {
 
         {/* ── Charts Row 2 ── */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Fix #3: Repayment Rate Trend – placeholder until GET /api/analytics/repayment-trend is live */}
+          {/* Repayment Rate Trend */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-5 w-5 text-emerald-600" />Repayment Rate Trend</CardTitle></CardHeader>
             <CardContent>
-              <div className="mb-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">{CHART_PLACEHOLDER_NOTICE}</div>
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Connect <code className="mx-1 rounded bg-muted px-1 font-mono text-xs">GET /api/analytics/repayment-trend</code></div>
+              {loadingAnalytics ? <Skeleton className="h-40 w-full" /> : analyticsData?.repaymentTrend && analyticsData.repaymentTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={analyticsData.repaymentTrend}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip formatter={(v: number) => `${v}%`} />
+                    <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">No repayment trend data</div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Fix #3: Risk Exposure – placeholder until GET /api/analytics/risk-exposure is live */}
+          {/* Risk Exposure */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-red-600" />Risk Exposure</CardTitle></CardHeader>
             <CardContent>
-              <div className="mb-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">{CHART_PLACEHOLDER_NOTICE}</div>
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Connect <code className="mx-1 rounded bg-muted px-1 font-mono text-xs">GET /api/analytics/risk-exposure</code></div>
+              {loadingAnalytics ? <Skeleton className="h-40 w-full" /> : analyticsData?.riskExposure && analyticsData.riskExposure.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={analyticsData.riskExposure}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(v) => `₦${(v/1_000_000).toFixed(1)}M`} />
+                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Bar dataKey="exposure" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">No risk exposure data</div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Fix #3: Defaulter Trends – placeholder until GET /api/analytics/defaulter-trend is live */}
+          {/* Defaulter Trends */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><UserX className="h-5 w-5 text-amber-600" />Defaulter Trends</CardTitle></CardHeader>
             <CardContent>
-              <div className="mb-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">{CHART_PLACEHOLDER_NOTICE}</div>
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Connect <code className="mx-1 rounded bg-muted px-1 font-mono text-xs">GET /api/analytics/defaulter-trend</code></div>
+              {loadingAnalytics ? <Skeleton className="h-40 w-full" /> : analyticsData?.defaulterTrend && analyticsData.defaulterTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={analyticsData.defaulterTrend}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">No defaulter trend data</div>
+              )}
             </CardContent>
           </Card>
         </div>

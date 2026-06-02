@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
 import { supabase } from "@workspace/db";
+import { requireAuth, requireRole } from "../middleware/auth";
 
 const router: IRouter = Router();
+router.use(requireAuth);
 
-router.get("/compliance/summary", async (req, res): Promise<void> => {
+router.get("/compliance/summary", requireRole("viewer", "operator", "admin", "super_admin"), async (req, res): Promise<void> => {
   const { count: pending } = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "pending");
   const { count: approved } = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "verified");
   const { count: flagged } = await supabase.from("kyc").select("*", { count: "exact", head: true }).eq("status", "in_review");
@@ -26,7 +28,7 @@ router.get("/compliance/summary", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/compliance", async (req, res): Promise<void> => {
+router.get("/compliance", requireRole("viewer", "operator", "admin", "super_admin"), async (req, res): Promise<void> => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Number(req.query.limit) || 20);
   const offset = (page - 1) * limit;
@@ -67,7 +69,8 @@ router.get("/compliance", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/compliance/:id/approve", async (req, res): Promise<void> => {
+// Compliance approve/reject require operator role minimum
+router.post("/compliance/:id/approve", requireRole("operator", "admin", "super_admin"), async (req, res): Promise<void> => {
   const id = req.params.id;
   const { data: updated, error } = await supabase.from("kyc").update({
     status: "verified",
@@ -85,7 +88,7 @@ router.post("/compliance/:id/approve", async (req, res): Promise<void> => {
   res.json({ id: updated.id, status: "approved", reviewedAt: updated.verified_at });
 });
 
-router.post("/compliance/:id/reject", async (req, res): Promise<void> => {
+router.post("/compliance/:id/reject", requireRole("operator", "admin", "super_admin"), async (req, res): Promise<void> => {
   const id = req.params.id;
   const { reason } = req.body;
 

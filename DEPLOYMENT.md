@@ -1,58 +1,81 @@
 # Deployment Guide — Coopvest Africa Admin Dashboard
 
-This project deploys the **frontend to Vercel** and the **backend to Render**.
+This project deploys the **backend API to Render** and the **frontend to Vercel**.
+
+---
+
+## Deployment Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Production                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Vercel (Frontend)              Render (Backend API)            │
+│   ┌──────────────────┐           ┌──────────────────────┐       │
+│   │ coopvest-dashboard│           │   coopvest-api        │       │
+│   │  Static Hosting   │◄────────►│   Express + Node.js   │       │
+│   │  vercel.app       │  REST    │   Port 10000          │       │
+│   └──────────────────┘           └──────────┬───────────┘       │
+│                                             │                    │
+│                                             ▼                    │
+│                                  ┌──────────────────────┐       │
+│                                  │     Supabase          │       │
+│                                  │   PostgreSQL + Auth   │       │
+│                                  └──────────────────────┘       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Deployment Strategy
+
+| Component | Platform | Build Command | Output |
+|-----------|----------|---------------|--------|
+| Backend API | Render | `./render-build.sh` | `artifacts/api-server/dist/` |
+| Frontend | Vercel | `pnpm --filter @workspace/coopvest-dashboard run build` | `artifacts/coopvest-dashboard/dist/public` |
+
+### Key Decisions
+
+1. **Render uses the build script** — `render-build.sh` installs pnpm, runs `pnpm install`, and builds the API server from source. This ensures the build is reproducible and not dependent on pre-committed dist files.
+
+2. **Vercel builds the frontend** — The `vercel.json` at the root configures everything for the frontend build.
+
+3. **Both platforms can host both** — If you prefer to host everything on Render, you can uncomment the frontend service block in `render.yaml` and remove the Vercel setup.
 
 ---
 
 ## Current Deployment Status
 
-| Service | URL | Status |
-|---------|-----|--------|
-| Backend (Render) | https://coopvest-api-v3.onrender.com | ✅ Live |
-| Frontend (Vercel) | TBD — follow step 2 below | — |
-
----
-
-## How the Backend Build Works (important)
-
-Render's free plan cannot run `pnpm` or `npm install -g` reliably during build.
-The solution: **the API server dist is pre-built and committed to the repo**.
-
-- `artifacts/api-server/dist/` contains the esbuild bundle (committed).
-- `artifacts/api-server/dist/package.json` lists only `@supabase/supabase-js` as a runtime dep.
-- Render's build command just runs `cd artifacts/api-server/dist && npm install --omit=dev` (installs supabase only).
-- The start command runs `node artifacts/api-server/dist/index.mjs`.
-
-**When you make backend code changes**, you must rebuild and commit the dist:
-```bash
-pnpm --filter @workspace/api-server run build
-# then commit artifacts/api-server/dist/ to git and push
-```
+| Service | Platform | URL | Status |
+|---------|----------|-----|--------|
+| Backend API | Render | https://coopvest-api.onrender.com | ✅ Live |
+| Frontend | Vercel | TBD — follow steps below | — |
 
 ---
 
 ## 1. Deploy / Redeploy the Backend on Render
 
-The service `coopvest-api-v3` already exists at https://coopvest-api-v3.onrender.com.
+The service `coopvest-api` should already exist (or will be created on first push).
 
-### Render service settings
-- **Build command**: `cd artifacts/api-server/dist && npm install --omit=dev`
-- **Start command**: `node --enable-source-maps artifacts/api-server/dist/index.mjs`
+### Render service settings (for new service)
+- **Name**: `coopvest-api`
+- **Build command**: `./render-build.sh`
+- **Start command**: `pnpm --filter @workspace/api-server start`
 - **Plan**: Free
 
-### Required environment variables (already set)
-| Key | Value |
-|-----|-------|
-| `NODE_ENV` | `production` |
-| `PORT` | `10000` |
-| `SUPABASE_URL` | `https://nyoauzqezpxeonmrxxgi.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | *(set in Render dashboard — keep secret)* |
-| `ALLOWED_ORIGIN` | Your Vercel frontend URL (or `*` temporarily) |
+### Required environment variables
+| Key | Required | Notes |
+|-----|----------|-------|
+| `NODE_ENV` | yes | Set to `production` |
+| `PORT` | yes | Set to `10000` |
+| `SUPABASE_URL` | **yes** | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | **yes** | Supabase service role key (keep secret) |
+| `ALLOWED_ORIGIN` | **yes** | Your Vercel frontend URL (e.g., `https://your-app.vercel.app`) |
 
 ### To redeploy after backend changes
-1. Rebuild locally: `pnpm --filter @workspace/api-server run build`
-2. Commit the updated `artifacts/api-server/dist/` files and push to GitHub.
-3. Go to [dashboard.render.com](https://dashboard.render.com/web/srv-d8epoj42m8qs7396p1tg) → **Manual Deploy**.
+1. Commit and push to GitHub.
+2. Render auto-deploys on the next push.
 
 ---
 
@@ -68,18 +91,28 @@ The `vercel.json` at the repo root configures everything.
 4. Vercel auto-detects `vercel.json`. Leave Framework Preset as detected.
 5. Before deploying, click **Environment Variables** and add:
 
-   | Key | Value |
-   |-----|-------|
-   | `VITE_SUPABASE_URL` | `https://nyoauzqezpxeonmrxxgi.supabase.co` |
-   | `VITE_SUPABASE_ANON_KEY` | Your Supabase **anon/public** key (safe to expose) |
-   | `VITE_API_URL` | `https://coopvest-api-v3.onrender.com` |
+| Key | Value |
+|-----|-------|
+| `VITE_SUPABASE_URL` | `https://nyoauzqezpxeonmrxxgi.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase **anon/public** key (safe to expose) |
+| `VITE_API_URL` | `https://coopvest-api.onrender.com` |
 
 6. Click **Deploy**.
 7. Once done, copy your Vercel URL (e.g. `https://your-app.vercel.app`).
 
 ### After frontend deployment: update Render's ALLOWED_ORIGIN
 
-Go to [Render dashboard](https://dashboard.render.com/web/srv-d8epoj42m8qs7396p1tg) → **Environment** → update `ALLOWED_ORIGIN` to your exact Vercel URL, then redeploy.
+Go to [Render dashboard](https://dashboard.render.com) → select `coopvest-api` → **Environment** → update `ALLOWED_ORIGIN` to your exact Vercel URL → redeploy.
+
+---
+
+## Alternative: Deploy Frontend to Render
+
+If you prefer to host everything on Render instead of Vercel:
+
+1. Uncomment the `coopvest-dashboard` service block in `render.yaml`
+2. Set `VITE_API_URL` to your Render backend URL
+3. Push to GitHub — both services will deploy.
 
 ---
 
@@ -102,12 +135,31 @@ Go to [Render dashboard](https://dashboard.render.com/web/srv-d8epoj42m8qs7396p1
 | `NODE_ENV` | yes | Set to `production` |
 | `SUPABASE_URL` | **yes** | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | **yes** | Supabase service role key (keep secret) |
-| `ALLOWED_ORIGIN` | **yes** | The Vercel frontend URL for CORS |
+| `ALLOWED_ORIGIN` | **yes** | The Vercel (or Render) frontend URL for CORS |
 
-### Frontend (Vercel)
+### Frontend (Vercel or Render)
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `VITE_SUPABASE_URL` | **yes** | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | **yes** | Supabase anon key (safe to expose) |
-| `VITE_API_URL` | **yes** | `https://coopvest-api-v3.onrender.com` |
+| `VITE_API_URL` | **yes** | Backend API URL (e.g., `https://coopvest-api.onrender.com`) |
 | `BASE_PATH` | auto | Set to `/` by vercel.json |
+
+---
+
+## Dockerfile Reference
+
+The `Dockerfile` supports multi-stage builds:
+
+```bash
+# Build API server container
+docker build --target api-server -t coopvest-api .
+
+# Build frontend preview container
+docker build --target frontend -t coopvest-frontend .
+
+# Default build (api-server)
+docker build -t coopvest-api .
+```
+
+Each stage can be built independently for local testing or alternative deployment targets.

@@ -19,6 +19,112 @@ tags:
   - name: support
   - name: riskScoring
   - name: interestRates
+  - name: analytics
+
+# ── Security Schemes ──────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token obtained from authentication
+
+  # ── Standard Error Response ──────────────────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid/expired
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Invalid or expired token"
+            code: "UNAUTHORIZED"
+
+    Forbidden:
+      description: Insufficient permissions for this action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Insufficient permissions. Required: one of [admin, super_admin]. Your role: viewer"
+            code: "FORBIDDEN"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Member not found"
+            code: "NOT_FOUND"
+
+    ValidationError:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Internal server error"
+            code: "INTERNAL_ERROR"
+
+  # ── Reusable Schemas ─────────────────────────────────────────────────────────
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+          enum: [UNAUTHORIZED, FORBIDDEN, NOT_FOUND, VALIDATION_ERROR, RATE_LIMITED, INTERNAL_ERROR]
+
+    ValidationErrorResponse:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          description: Human-readable error summary
+          example: "Validation failed"
+        details:
+          type: object
+          description: Field-level validation errors
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    Pagination:
+      type: object
+      required: [total, page, limit]
+      properties:
+        total:
+          type: integer
+          description: Total number of records
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Records per page
+
+security:
+  - BearerAuth: []
 
 paths:
   /healthz:

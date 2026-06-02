@@ -1,22 +1,50 @@
 services:
-    # Express API Backend — pre-built dist committed to repo
-    # Service: https://coopvest-api-v3.onrender.com
-    # Service ID: srv-d8epoj42m8qs7396p1tg
-    - type: web
-      name: coopvest-api-v3
-      env: node
-      plan: free
-      buildCommand: cd artifacts/api-server/dist && npm install --omit=dev
-      startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
-      envVars:
-        - key: NODE_ENV
-          value: production
-        - key: PORT
-          value: "10000"
-        - key: SUPABASE_URL
-          sync: false
-        - key: SUPABASE_SERVICE_ROLE_KEY
-          sync: false
-        - key: ALLOWED_ORIGIN
-          sync: false
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Backend: Express API Server on Render
+  # Service: https://coopvest-api.onrender.com
+  # ──────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: coopvest-api
+    env: node
+    plan: free
+    buildCommand: ./render-build.sh
+    startCommand: pnpm --filter @workspace/api-server start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Frontend: React Dashboard on Render (alternative to Vercel)
+  # Build produces artifacts/coopvest-dashboard/dist/public/
+  # ──────────────────────────────────────────────────────────────────────────────
+  # - type: web
+  #   name: coopvest-dashboard
+  #   env: static
+  #   buildCommand: pnpm --filter @workspace/coopvest-dashboard run build
+  #   staticPublishPath: artifacts/coopvest-dashboard/dist/public
+  #   headers:
+  #     - path: "/*"
+  #       name: "X-Content-Type-Options"
+  #       value: "nosniff"
+  #     - path: "/*"
+  #       name: "X-Frame-Options"
+  #       value: "DENY"
+  #     - path: "/*"
+  #       name: "Referrer-Policy"
+  #       value: "strict-origin-when-cross-origin"
+  #   envVars:
+  #     - key: VITE_SUPABASE_URL
+  #       sync: false
+  #     - key: VITE_SUPABASE_ANON_KEY
+  #       sync: false
+  #     - key: VITE_API_URL
+  #       value: https://coopvest-api.onrender.com
   
