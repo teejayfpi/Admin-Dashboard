@@ -191,7 +191,7 @@ export default function AuditLogs() {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold text-sm">{cfg.label}</span>
-                            <Badge className={severityColors[log.severity]} variant="outline">{log.severity}</Badge>
+                            <Badge className={severityColors[log.severity ?? "Info"] ?? ""} variant="outline">{log.severity ?? "Info"}</Badge>
                             <span className="text-xs text-muted-foreground">by <strong>{log.actor}</strong></span>
                             <span className="text-xs text-muted-foreground hidden sm:inline">·</span>
                             <Badge variant="outline" className="text-xs">{log.role}</Badge>

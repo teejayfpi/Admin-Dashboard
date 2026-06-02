@@ -141,7 +141,7 @@ const defaultForm = {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RoleManagement() {
   const [activeTab, setActiveTab] = useState("staff");
-  const [apiStaff, setApiStaff] = useState<ApiApiStaffAccount[]>([]);
+  const [apiStaff, setApiStaff] = useState<ApiStaffAccount[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editStaff, setEditStaff] = useState<ApiStaffAccount | null>(null);
@@ -155,7 +155,7 @@ export default function RoleManagement() {
     setLoadingStaff(true);
     fetch("/api/roles", { headers: { "Content-Type": "application/json" } })
       .then(r => r.json())
-      .then(d => { setApiStaff((d as { admins?: ApiApiStaffAccount[] }).admins ?? []); })
+      .then(d => { setApiStaff((d as { admins?: ApiStaffAccount[] }).admins ?? []); })
       .catch(() => setApiStaff([]))
       .finally(() => setLoadingStaff(false));
   }, []);
@@ -165,10 +165,10 @@ export default function RoleManagement() {
   // Group permissions by category
   const categories = [...new Set(ALL_PERMISSIONS.map(p => p.category))];
 
-  const filtered = staff.filter((s: ApiStaffAccount) =>
+  const filtered = staff.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.email.toLowerCase().includes(search.toLowerCase()) ||
-    ROLES[s.role].label.toLowerCase().includes(search.toLowerCase())
+    (ROLES[s.role as RoleKey]?.label ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   async function createStaff() {
@@ -179,13 +179,11 @@ export default function RoleManagement() {
     setCreating(true);
     await new Promise(r => setTimeout(r, 800));
     const newStaff: ApiStaffAccount = {
-      id: apiStaff.length + 1,
-      name: form.name, email: form.email, phone: "",
+      id: String(apiStaff.length + 1),
+      name: form.name, email: form.email,
       role: form.role, status: "active",
       createdAt: new Date().toISOString().split("T")[0],
-      lastLogin: "—",
-      mfaEnabled: false, createdBy: "c.obi@coopvest.ng",
-      permissions: ROLE_PERMISSIONS[form.role],
+      lastActive: "—",
     };
     setApiStaff(prev => [...prev, newStaff]);
     toast({ title: "Staff Account Created", description: `${form.name} has been added as ${ROLES[form.role].label}.` });
@@ -194,7 +192,7 @@ export default function RoleManagement() {
     setCreating(false);
   }
 
-  function toggleStatus(id: number) {
+  function toggleStatus(id: string) {
     setApiStaff(prev => prev.map(s =>
       s.id === id ? { ...s, status: s.status === "active" ? "suspended" : "active" } : s
     ));
@@ -208,7 +206,7 @@ export default function RoleManagement() {
     toast({ title: "Permissions Updated", description: `Custom permissions saved for ${updatedStaff.name}.` });
   }
 
-  function deleteStaff(id: number) {
+  function deleteStaff(id: string) {
     const s = staff.find(s => s.id === id);
     setApiStaff(prev => prev.filter(s => s.id !== id));
     toast({ title: "Account Removed", description: `${s?.name}'s account has been deleted.` });
@@ -233,7 +231,7 @@ export default function RoleManagement() {
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {(Object.keys(ROLES) as RoleKey[]).map(role => {
-            const count = staff.filter(s => s.role === role).length;
+            const count = staff.filter(s => s.role === (role as string)).length;
             const RoleIcon = ROLES[role].icon;
             return (
               <Card key={role}>
@@ -287,7 +285,10 @@ export default function RoleManagement() {
           <div className="py-8 text-center text-muted-foreground">Loading staff…</div>
         ) : filtered.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No staff accounts found.</div>
-        ) : filtered.map((s: ApiStaffAccount) => (
+        ) : filtered.map((s) => {
+                      const rk = s.role as RoleKey;
+                      const rd = ROLES[rk];
+                      return (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -303,9 +304,11 @@ export default function RoleManagement() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge className={ROLES[s.role].color} variant="outline">
-                              {ROLES[s.role].label}
-                            </Badge>
+                            {rd && (
+                              <Badge className={rd.color} variant="outline">
+                                {rd.label}
+                              </Badge>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {false
@@ -336,7 +339,8 @@ export default function RoleManagement() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -480,7 +484,7 @@ export default function RoleManagement() {
             </DialogHeader>
             <div className="py-2 space-y-4">
               <div className="flex items-center gap-3">
-                <Badge className={ROLES[permEditStaff.role].color} variant="outline">{ROLES[permEditStaff.role].label}</Badge>
+                <Badge className={ROLES[permEditStaff.role as RoleKey]?.color ?? ""} variant="outline">{ROLES[permEditStaff.role as RoleKey]?.label ?? permEditStaff.role}</Badge>
                 <span className="text-sm text-muted-foreground">Customize permissions for this staff member</span>
               </div>
               {categories.map(cat => (
@@ -488,20 +492,14 @@ export default function RoleManagement() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-2 border-b pb-1">{cat}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {ALL_PERMISSIONS.filter(p => p.category === cat).map(perm => {
-                      const has = [].includes(perm.id);
+                      const rolePerms = ROLE_PERMISSIONS[permEditStaff.role as RoleKey] ?? [];
+                      const has = rolePerms.includes(perm.id);
                       return (
                         <div key={perm.id} className="flex items-center gap-2">
                           <Checkbox
                             id={perm.id}
                             checked={has}
-                            onCheckedChange={checked => {
-                              setPermEditStaff(prev => prev ? {
-                                ...prev,
-                                permissions: checked
-                                  ? [...prev.permissions, perm.id]
-                                  : prev.permissions.filter(p => p !== perm.id),
-                              } : null);
-                            }}
+                            disabled
                           />
                           <Label htmlFor={perm.id} className="text-sm cursor-pointer">{perm.label}</Label>
                         </div>
@@ -513,7 +511,6 @@ export default function RoleManagement() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => {
-                setPermEditStaff({ ...staff.find(s => s.id === permEditStaff.id)! });
                 setPermEditStaff(null);
               }}>Cancel</Button>
               <Button onClick={() => savePermissions(permEditStaff)}>Save Permissions</Button>

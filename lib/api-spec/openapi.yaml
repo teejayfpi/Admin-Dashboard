@@ -212,6 +212,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
         - name: page
           in: query
           schema:
@@ -690,11 +694,17 @@ components:
       properties:
         totalMembers:
           type: integer
+        activeMembers:
+          type: integer
         activeLoans:
           type: integer
         totalContributions:
           type: number
+        totalSavings:
+          type: number
         loansDisbursed:
+          type: number
+        totalLoansIssued:
           type: number
         repaymentRate:
           type: number
@@ -704,13 +714,23 @@ components:
           type: integer
         totalInvestments:
           type: number
+        riskExposure:
+          type: number
+        activeDefaulters:
+          type: integer
+        activeOrganizations:
+          type: integer
+        monthlyGrowth:
+          type: number
         membersGrowth:
           type: number
         loansGrowth:
           type: number
+        savingsGrowth:
+          type: number
         contributionsGrowth:
           type: number
-      required: [totalMembers, activeLoans, totalContributions, loansDisbursed, repaymentRate, pendingCompliance, openSupportTickets, totalInvestments, membersGrowth, loansGrowth, contributionsGrowth]
+      required: [totalMembers, activeMembers, activeLoans, totalContributions, totalSavings, loansDisbursed, totalLoansIssued, repaymentRate, pendingCompliance, openSupportTickets, totalInvestments, riskExposure, activeDefaulters, activeOrganizations, monthlyGrowth, membersGrowth, loansGrowth, savingsGrowth, contributionsGrowth]
 
     MonthlyData:
       type: object
@@ -858,7 +878,11 @@ components:
           type: integer
         newThisMonth:
           type: integer
-      required: [total, active, inactive, suspended, pending, newThisMonth]
+        loanDefaulters:
+          type: integer
+        highRisk:
+          type: integer
+      required: [total, active, inactive, suspended, pending, newThisMonth, loanDefaulters, highRisk]
 
     Loan:
       type: object
@@ -1022,6 +1046,10 @@ components:
           type: number
         overdueAmount:
           type: number
+        overdue:
+          type: integer
+        pending:
+          type: integer
         thisMonth:
           type: number
         collectionRate:
@@ -1030,7 +1058,7 @@ components:
           type: integer
         paidThisMonth:
           type: integer
-      required: [totalCollected, pendingAmount, overdueAmount, thisMonth, collectionRate, totalMembers, paidThisMonth]
+      required: [totalCollected, pendingAmount, overdueAmount, overdue, pending, thisMonth, collectionRate, totalMembers, paidThisMonth]
 
     Investment:
       type: object

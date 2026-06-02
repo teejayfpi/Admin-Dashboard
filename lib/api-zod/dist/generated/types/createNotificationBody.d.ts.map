@@ -1,0 +1,1 @@
+{"version":3,"file":"createNotificationBody.d.ts","sourceRoot":"","sources":["../../../src/generated/types/createNotificationBody.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,0BAA0B,EAAE,MAAM,8BAA8B,CAAC;AAE/E,MAAM,WAAW,sBAAsB;IACrC,KAAK,EAAE,MAAM,CAAC;IACd,OAAO,EAAE,MAAM,CAAC;IAChB,IAAI,EAAE,0BAA0B,CAAC;IACjC,cAAc,CAAC,EAAE,MAAM,CAAC;CACzB"}
