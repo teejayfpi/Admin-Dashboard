@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { QueryFunction, QueryKey, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
-import type { ErrorType } from './custom-fetch';
+import type { ErrorType } from '../custom-fetch';
 import { customFetch } from '../custom-fetch';
 import type { Member } from './api.schemas';
 
