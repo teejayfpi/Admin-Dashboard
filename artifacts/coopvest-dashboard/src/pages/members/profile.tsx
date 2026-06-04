@@ -100,12 +100,23 @@ export default function MemberProfile() {
         if (response.ok) {
           const data = await response.json();
           const members = data.data || data;
-          // Find member with matching UUID
-          const found = members.find((m: any) => m.id === memberIdFromUrl);
+          // Find member with matching ID (UUID) - compare as strings
+          const found = members.find((m: any) => String(m.id) === String(memberIdFromUrl));
           if (found) {
             setMemberData(found);
           } else {
-            setLoadingError('Member not found');
+            // Try alternate: compare memberId field
+            const foundAlt = members.find((m: any) => 
+              String(m.memberId) === String(memberIdFromUrl) || 
+              String(m.id).includes(String(memberIdFromUrl))
+            );
+            if (foundAlt) {
+              setMemberData(foundAlt);
+            } else {
+              console.error('Member not found. Looking for:', memberIdFromUrl);
+              console.error('Available IDs:', members.map((m: any) => m.id));
+              setLoadingError('Member not found');
+            }
           }
         } else {
           setLoadingError('Failed to load member');
