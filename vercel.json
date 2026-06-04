@@ -3,8 +3,8 @@
   "buildCommand": "cd artifacts/coopvest-dashboard && npm install && npm run build",
   "installCommand": "npm install",
   "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/" }
   ]
 }
