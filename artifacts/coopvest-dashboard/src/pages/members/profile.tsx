@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useGetMember, useGetLoans, useGetContributions, useGetInvestments, useGetTransactions, useUpdateMember, getGetMemberQueryKey } from "@workspace/api-client-react";
+import { useGetMember, useGetLoans, useGetContributions, useGetInvestments, useUpdateMember, getGetMemberQueryKey } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
 import {
   ArrowLeft, Mail, Phone, Ban, Lock, KeyRound, CheckCircle2, CreditCard,
@@ -74,9 +74,8 @@ export default function MemberProfile() {
   const { data: investments } = useGetInvestments({ memberId: memberNumericId }, {
     query: { enabled: !!memberData, retry: 1 }
   });
-  const { data: transactions } = useGetTransactions({ memberId: memberNumericId }, {
-    query: { enabled: !!memberData, retry: 1 }
-  });
+  // Transactions API is not available, use empty array as placeholder
+  const transactions = { data: [] };
 
   useEffect(() => {
     if (!memberIdFromUrl) {
