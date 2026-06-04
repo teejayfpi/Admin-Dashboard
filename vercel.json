@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "cd artifacts/coopvest-dashboard && npm install && npm run build",
+  "installCommand": "npm install",
   "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
   "cleanUrls": true,
   "rewrites": [
