@@ -3,6 +3,7 @@
   "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": null,
+  "rootDirectory": "",
   "env": {
     "BASE_PATH": "/"
   }
