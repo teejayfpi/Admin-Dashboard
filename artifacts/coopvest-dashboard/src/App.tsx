@@ -34,6 +34,10 @@ import GuarantorSystem from "@/pages/guarantor-system/index";
 import ExcelManager from "@/pages/excel-manager/index";
 import ResetPassword from "@/pages/reset-password";
 
+// Check for required environment variables
+const hasSupabase = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+const hasApiUrl = Boolean(import.meta.env.VITE_API_BASE_URL);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -81,12 +85,42 @@ function Router() {
   );
 }
 
+// Fallback UI when environment is misconfigured
+function ConfigError() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md space-y-8 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-amber-100 text-amber-600 mx-auto">
+          <span className="text-3xl font-bold">!</span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Configuration Required</h1>
+        <p className="text-muted-foreground text-sm">
+          This application requires environment variables to be configured.
+        </p>
+        <div className="bg-muted rounded-lg p-4 text-left text-sm space-y-2">
+          <p className="font-semibold">Required Environment Variables:</p>
+          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+            <li>VITE_SUPABASE_URL{!import.meta.env.VITE_SUPABASE_URL && <span className="text-red-500 ml-2">- MISSING</span>}</li>
+            <li>VITE_SUPABASE_ANON_KEY{!import.meta.env.VITE_SUPABASE_ANON_KEY && <span className="text-red-500 ml-2">- MISSING</span>}</li>
+          </ul>
+          <p className="pt-2 text-xs">Set these in your Vercel project settings or .env file.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  // Show config error if Supabase is not configured
+  if (!hasSupabase) {
+    return <ConfigError />;
+  }
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
             <ErrorBoundary>
               <Router />
             </ErrorBoundary>
