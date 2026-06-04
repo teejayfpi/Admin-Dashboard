@@ -1,5 +1,5 @@
 {
-  "buildCommand": "echo 'Using pre-built dist folder'",
+  "buildCommand": "true",
   "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
   "framework": null,
   "env": {
