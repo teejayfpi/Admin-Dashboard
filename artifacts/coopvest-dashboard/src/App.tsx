@@ -33,10 +33,7 @@ import ReferralProgram from "@/pages/referral-program/index";
 import GuarantorSystem from "@/pages/guarantor-system/index";
 import ExcelManager from "@/pages/excel-manager/index";
 import ResetPassword from "@/pages/reset-password";
-
-// Check for required environment variables
-const hasSupabase = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
-const hasApiUrl = Boolean(import.meta.env.VITE_API_BASE_URL);
+import { useState, useEffect } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,8 +97,8 @@ function ConfigError() {
         <div className="bg-muted rounded-lg p-4 text-left text-sm space-y-2">
           <p className="font-semibold">Required Environment Variables:</p>
           <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-            <li>VITE_SUPABASE_URL{!import.meta.env.VITE_SUPABASE_URL && <span className="text-red-500 ml-2">- MISSING</span>}</li>
-            <li>VITE_SUPABASE_ANON_KEY{!import.meta.env.VITE_SUPABASE_ANON_KEY && <span className="text-red-500 ml-2">- MISSING</span>}</li>
+            <li>VITE_SUPABASE_URL{!window.ENV_VITE_SUPABASE_URL && <span className="text-red-500 ml-2">- MISSING</span>}</li>
+            <li>VITE_SUPABASE_ANON_KEY{!window.ENV_VITE_SUPABASE_ANON_KEY && <span className="text-red-500 ml-2">- MISSING</span>}</li>
           </ul>
           <p className="pt-2 text-xs">Set these in your Vercel project settings or .env file.</p>
         </div>
@@ -111,6 +108,26 @@ function ConfigError() {
 }
 
 function App() {
+  const [hasSupabase, setHasSupabase] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for required environment variables at runtime
+    const supabaseUrl = window.ENV_VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = window.ENV_VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+    setHasSupabase(Boolean(supabaseUrl && supabaseKey));
+    setIsLoading(false);
+  }, []);
+
+  // Show loading state while checking
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   // Show config error if Supabase is not configured
   if (!hasSupabase) {
     return <ConfigError />;

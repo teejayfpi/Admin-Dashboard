@@ -12,6 +12,12 @@ import { defineConfig } from "vite";
       react(),
       tailwindcss(),
     ],
+    define: {
+      // Expose env vars to window for runtime access
+      'window.ENV_VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || ''),
+      'window.ENV_VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || ''),
+      'window.ENV_VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || ''),
+    },
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "src"),
