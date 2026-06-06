@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
   reversed: "bg-gray-100 text-gray-600",
 };
 
-type DialogType = "approve" | "reverse" | "adjust" | "add" | null;
+type DialogType = "approve" | "reverse" | "adjust" | "add" | "addSingle" | null;
 
 export default function Contributions() {
   const [search, setSearch] = useState("");
@@ -40,8 +40,18 @@ export default function Contributions() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Single contribution form state
+  const [singleAmount, setSingleAmount] = useState("");
+  const [singleMonth, setSingleMonth] = useState("");
+  const [singlePaymentMethod, setSinglePaymentMethod] = useState("wallet");
+  const [singleMemberSearch, setSingleMemberSearch] = useState("");
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [searchingMember, setSearchingMember] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const { data: summary, isLoading: loadingSummary } = useGetContributionSummary();
-  const { data, isLoading } = useGetContributions({ page, limit: 20 });
+  const { data, isLoading, refetch } = useGetContributions({ page, limit: 20 });
   const { data: trendsRaw } = useGetMonthlyContributions();
 
   const contributions = Array.isArray(data?.data) ? data.data : [];
@@ -98,6 +108,77 @@ export default function Contributions() {
     URL.revokeObjectURL(url);
   }
 
+  // Search members for single contribution
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (singleMemberSearch.length >= 2) {
+        setSearchingMember(true);
+        try {
+          const token = await getAccessToken();
+          const res = await fetch(`/api/members?search=${encodeURIComponent(singleMemberSearch)}&limit=5`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const json = await res.json();
+          const members = Array.isArray(json.data) ? json.data : [];
+          setMemberResults(members);
+        } catch {
+          setMemberResults([]);
+        } finally {
+          setSearchingMember(false);
+        }
+      } else {
+        setMemberResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [singleMemberSearch]);
+
+  async function getAccessToken() {
+    const { getAccessToken } = await import("@workspace/api-client-react");
+    return getAccessToken();
+  }
+
+  async function submitSingleContribution() {
+    if (!selectedMember || !singleAmount || !singleMonth) {
+      toast({ title: "Error", description: "Please select a member, enter amount and month", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/contributions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          memberId: selectedMember.id,
+          amount: Number(singleAmount),
+          month: singleMonth,
+          paymentMethod: singlePaymentMethod,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to submit");
+      toast({ title: "Success", description: `Contribution of ${formatCurrency(Number(singleAmount))} recorded for ${selectedMember.name}` });
+      setSingleAmount("");
+      setSingleMonth("");
+      setSingleMemberSearch("");
+      setSelectedMember(null);
+      setDialog({ type: null });
+      refetch();
+    } catch {
+      toast({ title: "Error", description: "Failed to record contribution", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function resetSingleContributionForm() {
+    setSingleAmount("");
+    setSingleMonth("");
+    setSingleMemberSearch("");
+    setSelectedMember(null);
+    setMemberResults([]);
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -107,8 +188,8 @@ export default function Contributions() {
             <p className="text-muted-foreground">Track, approve, and manage all member contributions</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleAction("add")}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Record Contribution
+            <Button size="sm" onClick={() => { setDialog({ type: "addSingle" }); resetSingleContributionForm(); }}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Contribution
             </Button>
             <Button variant="outline" size="sm" onClick={() => setDialog({ type: "add" })}>
               <Upload className="mr-2 h-4 w-4" /> Upload Excel
@@ -427,6 +508,102 @@ export default function Contributions() {
             <Button variant="outline" onClick={() => { setDialog({ type: null }); setUploadFile(null); }}>Cancel</Button>
             <Button onClick={processUpload} disabled={!uploadFile || uploading}>
               {uploading ? "Processing…" : "Upload & Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Single Contribution Dialog */}
+      <Dialog open={dialog.type === "addSingle"} onOpenChange={() => { setDialog({ type: null }); resetSingleContributionForm(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5" /> Add Contribution
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Member Search */}
+            <div className="space-y-2">
+              <Label>Select Member *</Label>
+              {selectedMember ? (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">{selectedMember.name}</p>
+                    <p className="text-xs text-muted-foreground">{selectedMember.email}</p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setSelectedMember(null); setSingleMemberSearch(""); }}>Change</Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or email…"
+                    value={singleMemberSearch}
+                    onChange={(e) => setSingleMemberSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                  {memberResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {memberResults.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
+                          onClick={() => { setSelectedMember(m); setMemberResults([]); }}
+                        >
+                          <p className="font-medium text-sm">{m.name || `${m.firstName} ${m.lastName}`}</p>
+                          <p className="text-xs text-muted-foreground">{m.email}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {searchingMember && <p className="text-xs text-muted-foreground mt-1">Searching…</p>}
+                </div>
+              )}
+            </div>
+
+            {/* Amount */}
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount (₦) *</Label>
+              <Input
+                id="amount"
+                type="number"
+                placeholder="5000"
+                value={singleAmount}
+                onChange={(e) => setSingleAmount(e.target.value)}
+                min="100"
+              />
+            </div>
+
+            {/* Month */}
+            <div className="space-y-2">
+              <Label htmlFor="month">Month (YYYY-MM) *</Label>
+              <Input
+                id="month"
+                type="month"
+                value={singleMonth}
+                onChange={(e) => setSingleMonth(e.target.value)}
+              />
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={singlePaymentMethod} onValueChange={setSinglePaymentMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wallet">Wallet</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="payroll_deduction">Payroll Deduction</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDialog({ type: null }); resetSingleContributionForm(); }}>Cancel</Button>
+            <Button onClick={submitSingleContribution} disabled={!selectedMember || !singleAmount || !singleMonth || submitting}>
+              {submitting ? "Submitting…" : "Record Contribution"}
             </Button>
           </DialogFooter>
         </DialogContent>
