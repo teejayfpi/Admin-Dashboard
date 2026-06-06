@@ -81,12 +81,24 @@ export default function ExcelManager() {
       const response = await fetch(`${apiUrl}/api/excel-uploads?limit=100`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      if (response.ok) {
-        const data = await response.json();
-        setUploads(Array.isArray(data.data) ? data.data : []);
+      const data = await response.json();
+      
+      // Handle various response formats
+      let uploadsArray = [];
+      if (Array.isArray(data)) {
+        uploadsArray = data;
+      } else if (data && typeof data === 'object') {
+        if (Array.isArray(data.data)) {
+          uploadsArray = data.data;
+        } else if (Array.isArray(data.uploads)) {
+          uploadsArray = data.uploads;
+        }
       }
+      
+      setUploads(uploadsArray);
     } catch (e) {
       console.error('Failed to fetch uploads:', e);
+      setUploads([]);
     } finally {
       setLoading(false);
     }
