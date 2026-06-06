@@ -87,6 +87,29 @@ export default function Members() {
     return response.json();
   };
 
+  // Direct API call for role management (only super_admin can do this)
+  const updateMemberRole = async (memberId: string, role: string) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://coopvest-api-v3.onrender.com';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+
+    const response = await fetch(`${baseUrl}/api/members/${memberId}/role`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update role');
+    }
+
+    return response.json();
+  };
+
   // Map tabs to filter params
   const tabToStatus: Record<string, string> = {
     all: "",
@@ -166,8 +189,6 @@ export default function Members() {
       freeze: { status: "frozen" },
       activate: { status: "active" },
       verify: { status: "active", kyc_verified: true },
-      make_admin: { role: "admin" },
-      remove_admin: { role: "member" },
     };
 
     const messages: Record<string, string> = {
@@ -185,11 +206,20 @@ export default function Members() {
     };
 
     try {
-      const updates = statusMap[action];
-      if (updates) {
-        await updateMemberApi(memberId, updates);
+      // Special handling for role changes - use dedicated endpoint
+      if (action === "make_admin") {
+        await updateMemberRole(memberId, "admin");
+        toast({ title: "Success", description: messages[action] || "Action completed." });
+      } else if (action === "remove_admin") {
+        await updateMemberRole(memberId, "member");
+        toast({ title: "Success", description: messages[action] || "Action completed." });
+      } else {
+        const updates = statusMap[action];
+        if (updates) {
+          await updateMemberApi(memberId, updates);
+        }
+        toast({ title: "Success", description: messages[action] || "Action completed." });
       }
-      toast({ title: "Success", description: messages[action] || "Action completed." });
       queryClient.invalidateQueries({ queryKey: ["getMembers"] });
       queryClient.invalidateQueries({ queryKey: ["getMemberStats"] });
       closeAction();
@@ -331,22 +361,29 @@ export default function Members() {
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-9 w-9">
+                                  {member.profilePicture ? (
+                                    <AvatarImage src={member.profilePicture} alt={`${member.firstName} ${member.lastName}`} />
+                                  ) : null}
                                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                                    {(() => {
-                                      const first = String(member.firstName ?? '');
-                                      const last = String(member.lastName ?? '');
-                                      return (first + ' ' + last).split(' ').filter(Boolean).map(n => n[0] || '').join('').slice(0, 2).toUpperCase() || '??';
-                                    })()}
+                                    {((member.firstName?.[0] || '') + (member.lastName?.[0] || '')).toUpperCase() || '??'}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                  <button
-                                    className="font-medium hover:text-primary hover:underline text-left"
-                                    onClick={() => setLocation(`/members/${member.id}`)}
-                                    data-testid={`member-link-${member.id}`}
-                                  >
-                                    {member.firstName} {member.lastName}
-                                  </button>
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      className="font-medium hover:text-primary hover:underline text-left"
+                                      onClick={() => setLocation(`/members/${member.id}`)}
+                                      data-testid={`member-link-${member.id}`}
+                                    >
+                                      {member.firstName} {member.lastName}
+                                    </button>
+                                    {member.role === 'super_admin' && (
+                                      <Badge className="bg-purple-100 text-purple-800 text-xs">Super Admin</Badge>
+                                    )}
+                                    {member.role === 'admin' && (
+                                      <Badge className="bg-amber-100 text-amber-800 text-xs">Admin</Badge>
+                                    )}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">{member.email}</div>
                                 </div>
                               </div>

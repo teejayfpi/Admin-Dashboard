@@ -241,6 +241,59 @@ router.put("/members/:id", async (req, res): Promise<void> => {
   });
 });
 
+// Role management - only super_admin can assign roles
+router.post("/members/:id/role", requireAuth, requireRole("super_admin"), async (req, res): Promise<void> => {
+  const id = req.params.id;
+  const { role } = req.body;
+
+  if (!role || !["member", "viewer", "operator", "admin", "super_admin"].includes(role)) {
+    res.status(400).json({ error: "Invalid role. Must be: member, viewer, operator, admin, or super_admin" });
+    return;
+  }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) { 
+    console.error("Error updating role:", error);
+    res.status(500).json({ error: error.message }); 
+    return; 
+  }
+  
+  if (!profile) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+
+  const { firstName, lastName } = splitName(profile.name);
+  res.json({ 
+    id: profile.id, 
+    memberId: profile.user_id, 
+    firstName, 
+    lastName, 
+    email: profile.email, 
+    phone: profile.phone ?? "", 
+    status: deriveStatus(profile), 
+    role: profile.role,
+    kycVerified: profile.kyc_verified || false,
+    profilePicture: profile.avatar_url || null,
+    occupation: profile.occupation || null,
+    organization: profile.organization || null,
+    employer: profile.employer || null,
+    joinDate: profile.created_at?.slice(0, 10) ?? null, 
+    address: profile.address || null,
+    createdAt: profile.created_at, 
+    totalContributions: 0, 
+    activeLoan: 0, 
+    riskScore: 0, 
+    avatarInitials: ((firstName[0] ?? "") + (lastName[0] ?? "")).toUpperCase() || "??" 
+  });
+});
+
 // Also support PATCH method
 router.patch("/members/:id", async (req, res): Promise<void> => {
   const id = req.params.id;

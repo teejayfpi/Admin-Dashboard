@@ -262,7 +262,7 @@ export default function MemberProfile() {
                   {(activeMember.avatarInitials || (activeMember.firstName?.[0] || '') + (activeMember.lastName?.[0] || '')).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              {activeMember.role === 'admin' && (
+              {(activeMember.role === 'admin' || activeMember.role === 'super_admin') && (
                 <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-amber-500 rounded-full flex items-center justify-center">
                   <Crown className="h-3 w-3 text-white" />
                 </div>
@@ -273,7 +273,8 @@ export default function MemberProfile() {
                 {activeMember.firstName} {activeMember.lastName}
                 <Badge className={statusColors[activeMember.status] || "bg-gray-100"}>{activeMember.status}</Badge>
                 {activeMember.kycVerified && <Badge className="bg-blue-100 text-blue-800"><BadgeCheck className="h-3 w-3 mr-1" />KYC</Badge>}
-                {activeMember.role === 'admin' && <Badge className="bg-amber-100 text-amber-800"><Crown className="h-3 w-3 mr-1" />Admin</Badge>}
+                {activeMember.role === 'super_admin' && <Badge className="bg-purple-100 text-purple-800"><Crown className="h-3 w-3 mr-1" />Super Admin</Badge>}
+                {activeMember.role === 'admin' && activeMember.role !== 'super_admin' && <Badge className="bg-amber-100 text-amber-800"><Crown className="h-3 w-3 mr-1" />Admin</Badge>}
               </h1>
               <p className="text-muted-foreground font-mono text-sm">ID: {activeMember.memberId}</p>
               {activeMember.email && <p className="text-muted-foreground text-sm">{activeMember.email}</p>}
