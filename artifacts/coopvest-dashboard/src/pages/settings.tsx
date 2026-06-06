@@ -82,10 +82,10 @@ export default function Settings() {
         }
         
         // Fetch organizations
-        const orgsRes = await customFetch<{ success: boolean; organizations: any[] }>(
+        const orgsRes = await customFetch<{ success: boolean; organizations?: any[] }>(
           "/api/v1/admin/organizations"
         );
-        if (orgsRes.success && orgsRes.organizations) {
+        if (orgsRes.success && Array.isArray(orgsRes.organizations)) {
           setOrganizations(
             orgsRes.organizations.map((org: any) => ({
               id: org.id,

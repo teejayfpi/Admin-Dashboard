@@ -37,8 +37,9 @@ export default function Sessions() {
     setLoading(true);
     try {
       const res = await fetch("/api/sessions");
-      const data = await res.json();
-      setSessions(data.data || []);
+      const json = await res.json();
+      const sessionsData = json && typeof json === 'object' && Array.isArray(json.data) ? json.data : [];
+      setSessions(sessionsData);
     } catch {
       toast({ title: "Error", description: "Failed to fetch sessions" });
     } finally {
@@ -49,8 +50,9 @@ export default function Sessions() {
   const fetchMySessions = async () => {
     try {
       const res = await fetch("/api/sessions/me");
-      const data = await res.json();
-      setMySessions(data.data || []);
+      const json = await res.json();
+      const mySessionsData = json && typeof json === 'object' && Array.isArray(json.data) ? json.data : [];
+      setMySessions(mySessionsData);
     } catch {
       toast({ title: "Error", description: "Failed to fetch your sessions" });
     }

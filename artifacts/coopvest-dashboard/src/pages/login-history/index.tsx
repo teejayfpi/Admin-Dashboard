@@ -43,8 +43,9 @@ export default function LoginHistory() {
       if (statusFilter !== "all") params.append("status", statusFilter);
 
       const res = await fetch(`/api/login-history?${params}`);
-      const data = await res.json();
-      setLogins(data.data || []);
+      const json = await res.json();
+      const loginsData = json && typeof json === 'object' && Array.isArray(json.data) ? json.data : [];
+      setLogins(loginsData);
     } catch {
       toast({ title: "Error", description: "Failed to fetch login history" });
     } finally {

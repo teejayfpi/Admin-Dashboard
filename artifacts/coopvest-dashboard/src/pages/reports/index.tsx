@@ -54,8 +54,9 @@ export default function Reports() {
     setLoading(true);
     try {
       const res = await fetch("/api/reports/scheduled");
-      const data = await res.json();
-      setReports(data.data || []);
+      const json = await res.json();
+      const reportsData = json && typeof json === 'object' && Array.isArray(json.data) ? json.data : [];
+      setReports(reportsData);
     } catch {
       toast({ title: "Error", description: "Failed to fetch reports", variant: "destructive" });
     } finally {

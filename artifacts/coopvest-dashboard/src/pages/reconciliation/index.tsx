@@ -37,8 +37,9 @@ export default function Reconciliation() {
     setLoading(true);
     try {
       const res = await fetch("/api/reconciliation/unreconciled?type=contributions");
-      const data = await res.json();
-      setUnreconciled(data.data || []);
+      const json = await res.json();
+      const unreconciledData = json && typeof json === 'object' && Array.isArray(json.data) ? json.data : [];
+      setUnreconciled(unreconciledData);
     } catch {
       toast({ title: "Error", description: "Failed to load unreconciled", variant: "destructive" });
     } finally {
