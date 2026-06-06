@@ -151,7 +151,7 @@ export default function MemberProfile() {
 
     try {
       // Fetch investments
-      const investRes = await fetch(`${baseUrl}/api/investments?profileId=${profileId}&limit=50`, {
+      const investRes = await fetch(`${baseUrl}/api/investments?profile_id=${profileId}&limit=50`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (investRes.ok) {

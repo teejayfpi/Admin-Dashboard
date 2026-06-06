@@ -52,7 +52,26 @@ router.get("/members/stats", async (req, res): Promise<void> => {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const { count: newThisMonth } = await supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", monthStart);
-  res.json({ total: total ?? 0, active: active ?? 0, inactive: inactive ?? 0, suspended: suspended ?? 0, pending: pending ?? 0, newThisMonth: newThisMonth ?? 0 });
+  
+  // Count loan defaulters (loans with overdue payments)
+  const { count: loanDefaulters } = await supabase.from("loans").select("*", { count: "exact", head: true })
+    .eq("status", "active")
+    .lt("remaining_balance", 0);
+  
+  // Count high-risk accounts (profiles with risk_score > 70 or flagged)
+  const { count: highRisk } = await supabase.from("profiles").select("*", { count: "exact", head: true })
+    .eq("is_flagged", true);
+  
+  res.json({ 
+    total: total ?? 0, 
+    active: active ?? 0, 
+    inactive: inactive ?? 0, 
+    suspended: suspended ?? 0, 
+    pending: pending ?? 0, 
+    newThisMonth: newThisMonth ?? 0,
+    loanDefaulters: loanDefaulters ?? 0,
+    highRisk: highRisk ?? 0,
+  });
 });
 
 router.get("/members", async (req, res): Promise<void> => {

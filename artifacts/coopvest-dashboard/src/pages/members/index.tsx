@@ -201,7 +201,7 @@ export default function Members() {
   
   const stats: StatCard[] = safeStats;
 
-  function openAction(memberId: number, action: AdminAction, memberName: string) {
+  function openAction(memberId: string, action: AdminAction, memberName: string) {
     setActionDialog({ open: true, memberId, action, memberName });
     setActionNote("");
   }

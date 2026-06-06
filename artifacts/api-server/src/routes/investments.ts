@@ -56,7 +56,42 @@ router.get("/investments", async (req, res): Promise<void> => {
   const limit = Math.min(100, Number(req.query.limit) || 20);
   const offset = (page - 1) * limit;
   const status = req.query.status as string | undefined;
+  const profileId = req.query.profile_id as string | undefined;
 
+  // If profile_id is provided, fetch user's investments from user_investments table
+  if (profileId) {
+    let query = supabase.from("user_investments").select("*", { count: "exact" }).eq("profile_id", profileId);
+    if (status) query = query.eq("status", status);
+
+    const { data: userInv, count, error } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    res.json({
+      data: (userInv ?? []).map(inv => ({
+        id: inv.id,
+        name: inv.investment_name || "Investment",
+        type: inv.investment_type || "pool",
+        amount: Number(inv.amount_invested || 0),
+        currentValue: Number(inv.current_value || inv.amount_invested || 0),
+        returns: Number(inv.current_value || inv.amount_invested || 0) - Number(inv.amount_invested || 0),
+        returnPercentage: Number(inv.return_rate || 0),
+        status: inv.status || "active",
+        startDate: inv.start_date?.slice(0, 10) ?? null,
+        maturityDate: inv.maturity_date?.slice(0, 10) ?? null,
+        description: inv.notes || null,
+        createdAt: inv.created_at,
+      })),
+      total: count ?? 0,
+      page,
+      limit,
+    });
+    return;
+  }
+
+  // Otherwise, fetch from investment_pools (the pool listings)
   let query = supabase.from("investment_pools").select("*", { count: "exact" });
   if (status) query = query.eq("status", status);
 
