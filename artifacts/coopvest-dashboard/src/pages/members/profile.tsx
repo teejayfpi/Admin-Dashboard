@@ -12,14 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useGetMember, useGetLoans, useGetContributions, useGetInvestments, getGetMemberQueryKey } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/format";
 import {
   ArrowLeft, Mail, Phone, Ban, Lock, KeyRound, CheckCircle2, CreditCard,
   ArrowUpDown, ShieldAlert, Wallet, PiggyBank, TrendingUp, FileText,
   Users, Building2, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight,
   Receipt, DollarSign, CalendarDays, User, BadgeCheck, Shield,
-  Eye, EyeOff, Download, Filter, Crown, Image
+  Eye, EyeOff, Download, Filter, Crown, Image, Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,34 +46,25 @@ export default function MemberProfile() {
   const [showBalances, setShowBalances] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fetch member by finding in the members list
+  // Member data state
   const [memberData, setMemberData] = useState<any>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(true);
 
-  // Fetch related data
-  const { data: loans } = useGetLoans({ memberId: 1 }, {
-    query: { enabled: false }
-  });
-  const { data: contributions } = useGetContributions({ memberId: 1 }, {
-    query: { enabled: false }
-  });
-  const { data: investments } = useGetInvestments({ memberId: 1 }, {
-    query: { enabled: false }
-  });
-  // Ensure these are always arrays
-  const loansData = loans?.data && Array.isArray(loans.data) ? loans.data : [];
-  const contributionsData = contributions?.data && Array.isArray(contributions.data) ? contributions.data : [];
-  const investmentsData = investments?.data && Array.isArray(investments.data) ? investments.data : [];
-  const transactions = { data: [] as any[] };
+  // Financial data state
+  const [loansData, setLoansData] = useState<any[]>([]);
+  const [contributionsData, setContributionsData] = useState<any[]>([]);
+  const [investmentsData, setInvestmentsData] = useState<any[]>([]);
+  const [transactionsData, setTransactionsData] = useState<any[]>([]);
 
+  // Fetch member data directly by ID
   useEffect(() => {
     if (!memberIdFromUrl) {
       setIsFetching(false);
       return;
     }
 
-    const fetchMember = async () => {
+    const fetchMemberData = async () => {
       setIsFetching(true);
       setLoadingError(null);
       try {
@@ -82,7 +72,8 @@ export default function MemberProfile() {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || '';
         
-        const response = await fetch(`${baseUrl}/api/members?limit=100`, {
+        // Fetch member directly by ID
+        const response = await fetch(`${baseUrl}/api/members/${memberIdFromUrl}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -90,27 +81,34 @@ export default function MemberProfile() {
         });
         
         if (response.ok) {
-          const data = await response.json();
-          const members = data.data || data;
-          // Find member with matching ID (UUID)
-          const found = members.find((m: any) => String(m.id) === String(memberIdFromUrl));
-          if (found) {
-            setMemberData(found);
-          } else {
-            // Try alternate: compare memberId field or partial match
-            const foundAlt = members.find((m: any) => 
-              String(m.memberId) === String(memberIdFromUrl) || 
-              String(m.id).includes(String(memberIdFromUrl))
+          const member = await response.json();
+          setMemberData(member);
+          
+          // Fetch related data for this member
+          fetchRelatedData(baseUrl, token, memberIdFromUrl);
+        } else if (response.status === 404) {
+          setLoadingError('Member not found');
+        } else {
+          // Try fetching from the list as fallback
+          const listResponse = await fetch(`${baseUrl}/api/members?limit=100`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (listResponse.ok) {
+            const listData = await listResponse.json();
+            const members = listData.data || listData;
+            const found = members.find((m: any) => 
+              String(m.id) === String(memberIdFromUrl) || 
+              String(m.memberId) === String(memberIdFromUrl)
             );
-            if (foundAlt) {
-              setMemberData(foundAlt);
+            if (found) {
+              setMemberData(found);
+              fetchRelatedData(baseUrl, token, found.id);
             } else {
-              console.error('Member not found. Looking for:', memberIdFromUrl);
               setLoadingError('Member not found');
             }
+          } else {
+            setLoadingError('Failed to load member');
           }
-        } else {
-          setLoadingError('Failed to load member');
         }
       } catch (err) {
         console.error('Error fetching member:', err);
@@ -120,8 +118,50 @@ export default function MemberProfile() {
       }
     };
 
-    fetchMember();
+    fetchMemberData();
   }, [memberIdFromUrl]);
+
+  // Fetch loans, contributions, investments for this member
+  const fetchRelatedData = async (baseUrl: string, token: string, profileId: string) => {
+    try {
+      // Fetch loans
+      const loansRes = await fetch(`${baseUrl}/api/loans?profileId=${profileId}&limit=50`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (loansRes.ok) {
+        const loansJson = await loansRes.json();
+        setLoansData(loansJson.data || []);
+      }
+    } catch (e) {
+      console.log('Loans fetch error:', e);
+    }
+
+    try {
+      // Fetch contributions
+      const contribRes = await fetch(`${baseUrl}/api/contributions?profileId=${profileId}&limit=50`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (contribRes.ok) {
+        const contribJson = await contribRes.json();
+        setContributionsData(contribJson.data || []);
+      }
+    } catch (e) {
+      console.log('Contributions fetch error:', e);
+    }
+
+    try {
+      // Fetch investments
+      const investRes = await fetch(`${baseUrl}/api/investments?profileId=${profileId}&limit=50`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (investRes.ok) {
+        const investJson = await investRes.json();
+        setInvestmentsData(investJson.data || []);
+      }
+    } catch (e) {
+      console.log('Investments fetch error:', e);
+    }
+  };
 
   // Direct API call for member updates
   const updateMemberApi = async (memberId: string, updates: any) => {
@@ -146,18 +186,63 @@ export default function MemberProfile() {
     return response.json();
   };
 
+  // Direct API call for role management
+  const updateMemberRole = async (memberId: string, role: string) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://coopvest-api-v3.onrender.com';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+
+    const response = await fetch(`${baseUrl}/api/members/${memberId}/role`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update role');
+    }
+
+    return response.json();
+  };
+
+  // Refresh member data
+  const refreshMemberData = async () => {
+    if (!memberIdFromUrl || !memberData?.id) return;
+    
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://coopvest-api-v3.onrender.com';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+    
+    try {
+      const response = await fetch(`${baseUrl}/api/members/${memberData.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setMemberData(updated);
+      }
+    } catch (e) {
+      console.log('Refresh error:', e);
+    }
+  };
+
   async function executeAction() {
-    if (!actionDialog.action || !memberData) return;
+    if (!actionDialog.action || !memberData?.id) return;
     
     setIsProcessing(true);
+    const { action } = actionDialog;
+    
     const statusMap: Record<string, any> = {
       suspend: { status: "suspended" },
       freeze: { status: "frozen" },
       activate: { status: "active" },
       verify: { status: "active", kyc_verified: true },
-      make_admin: { role: "admin" },
-      remove_admin: { role: "member" },
     };
+    
     const messages: Record<string, string> = {
       suspend: "Account suspended.",
       freeze: "Account frozen.",
@@ -173,25 +258,20 @@ export default function MemberProfile() {
     };
     
     try {
-      const updates = statusMap[actionDialog.action];
-      if (updates) {
-        await updateMemberApi(memberData.id, updates);
-        
-        // Refresh member data
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://coopvest-api-v3.onrender.com';
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || '';
-        const response = await fetch(`${baseUrl}/api/members?limit=100`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const members = data.data || data;
-          const found = members.find((m: any) => String(m.id) === String(memberIdFromUrl));
-          if (found) setMemberData(found);
+      if (action === "make_admin") {
+        await updateMemberRole(memberData.id, "admin");
+      } else if (action === "remove_admin") {
+        await updateMemberRole(memberData.id, "member");
+      } else {
+        const updates = statusMap[action];
+        if (updates) {
+          await updateMemberApi(memberData.id, updates);
         }
       }
-      toast({ title: "Success", description: messages[actionDialog.action] });
+      
+      toast({ title: "Success", description: messages[action] || "Action completed." });
+      await refreshMemberData();
+      queryClient.invalidateQueries({ queryKey: ["getMembers"] });
       setActionDialog({ open: false, action: null });
     } catch (err: any) {
       console.error('Update error:', err);
@@ -412,6 +492,10 @@ export default function MemberProfile() {
                     <div><span className="text-muted-foreground">Status</span><Badge className={statusColors[activeMember.status]}>{activeMember.status}</Badge></div>
                     <div><span className="text-muted-foreground">KYC Verified</span><p className="font-medium">{activeMember.kycVerified ? "Yes" : "No"}</p></div>
                     <div><span className="text-muted-foreground">Email Verified</span><p className="font-medium">{activeMember.emailVerified ? "Yes" : "Pending"}</p></div>
+                    {activeMember.occupation && <div><span className="text-muted-foreground">Occupation</span><p className="font-medium">{activeMember.occupation}</p></div>}
+                    {activeMember.organization && <div><span className="text-muted-foreground">Organization</span><p className="font-medium">{activeMember.organization}</p></div>}
+                    {activeMember.employer && <div><span className="text-muted-foreground">Employer</span><p className="font-medium">{activeMember.employer}</p></div>}
+                    {activeMember.address && <div className="col-span-2"><span className="text-muted-foreground">Address</span><p className="font-medium">{activeMember.address}</p></div>}
                   </div>
                 </CardContent>
               </Card>
@@ -453,8 +537,8 @@ export default function MemberProfile() {
                     <div><span className="text-muted-foreground">Risk Score</span><p className={`font-medium ${riskColor}`}>{activeMember.riskScore}/100</p></div>
                     <div><span className="text-muted-foreground">Created</span><p className="font-medium">{new Date(activeMember.createdAt).toLocaleDateString()}</p></div>
                     <div><span className="text-muted-foreground">Last Login</span><p className="font-medium">{activeMember.lastLogin ? new Date(activeMember.lastLogin).toLocaleString() : "N/A"}</p></div>
-                    <div><span className="text-muted-foreground">Contributions</span><p className="font-medium">{contributions?.data?.length ?? 0} payments</p></div>
-                    <div><span className="text-muted-foreground">Loans</span><p className="font-medium">{loans?.data?.length ?? 0} loans</p></div>
+                    <div><span className="text-muted-foreground">Contributions</span><p className="font-medium">{(contributionsData ?? []).length} payments</p></div>
+                    <div><span className="text-muted-foreground">Loans</span><p className="font-medium">{(loansData ?? []).length} loans</p></div>
                   </div>
                   <Separator />
                   <div className="space-y-2">
@@ -565,7 +649,7 @@ export default function MemberProfile() {
                 <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Export</Button>
               </CardHeader>
               <CardContent>
-                {(investments?.data?.length ?? 0) === 0 ? (
+                {(investmentsData ?? []).length === 0 ? (
                   <div className="text-center py-12">
                     <TrendingUp className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
                     <p className="text-muted-foreground">No investments yet</p>
@@ -606,14 +690,14 @@ export default function MemberProfile() {
                 </div>
               </CardHeader>
               <CardContent>
-                {(transactions?.data?.length ?? 0) === 0 ? (
+                {(transactionsData ?? []).length === 0 ? (
                   <div className="text-center py-12">
                     <Receipt className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
                     <p className="text-muted-foreground">No transactions found</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {(transactions.data ?? []).map((tx, i) => (
+                    {(transactionsData ?? []).map((tx, i) => (
                       <div key={tx.id} className={`flex items-center justify-between p-4 hover:bg-muted/50 ${i % 2 === 0 ? "bg-muted/20" : ""}`}>
                         <div className="flex items-center gap-3">
                           <div className={`h-8 w-8 rounded-full flex items-center justify-center ${tx.type === "credit" ? "bg-emerald-100" : "bg-red-100"}`}>
