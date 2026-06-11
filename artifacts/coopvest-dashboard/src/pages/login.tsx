@@ -71,30 +71,30 @@ export default function Login() {
     setError(null);
     
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      // Use custom password reset API
+      const apiUrl = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiUrl}/api/password-reset/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
       
-      if (resetError) {
-        // Handle specific Supabase error messages
-        const errorMsg = resetError.message.toLowerCase();
-        if (errorMsg.includes("not found") || errorMsg.includes("not found")) {
-          setError("No account found with this email address.");
-        } else if (errorMsg.includes("rate limit")) {
-          setError("Too many requests. Please try again later.");
-        } else if (errorMsg.includes("email disabled") || errorMsg.includes("disabled")) {
-          setError("Password reset is currently disabled. Contact support.");
-        } else {
-          // Generic error - likely SMTP configuration issue in Supabase
-          setError("Unable to send recovery email. Please contact admin@coopvest.africa");
-        }
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setError(data.error || "Failed to request password reset");
       } else {
-        // Success
+        // Success - show message
         toast({
-          title: "Password reset email sent",
-          description: `Check your inbox at ${email} for a reset link. Check your spam folder if you don't see it.`,
-          duration: 5000,
+          title: "Password reset link sent",
+          description: "Check your email for the reset link. Check your spam folder if you don't see it.",
+          duration: 6000,
         });
+        
+        // In development, show the reset link for testing
+        if (data.devResetLink) {
+          console.log("🔐 Password Reset Link (DEV):", data.devResetLink);
+        }
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");

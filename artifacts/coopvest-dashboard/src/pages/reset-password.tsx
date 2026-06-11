@@ -1,35 +1,70 @@
-// Quick Win: /reset-password page — handles Supabase password-reset redirect links
+// Reset Password Page — handles custom API password-reset tokens
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearchParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { ShieldCheck, AlertCircle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
+  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isValidToken, setIsValidToken] = useState(false);
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check if supabase is available
+  const token = searchParams.get("token");
+
+  // Verify token on mount
   useEffect(() => {
-    if (!supabase) {
-      setError("Authentication service not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.");
-    }
-  }, []);
+    const verifyToken = async () => {
+      if (!token) {
+        setIsVerifying(false);
+        setError("No reset token provided. Please request a new password reset link.");
+        return;
+      }
+
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const response = await fetch(`${apiUrl}/api/password-reset/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.valid) {
+          setError(data.error || "Invalid or expired reset token");
+          setIsValidToken(false);
+        } else {
+          setEmail(data.email || "");
+          setIsValidToken(true);
+        }
+      } catch {
+        setError("Failed to verify reset token. Please try again.");
+        setIsValidToken(false);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    verifyToken();
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
-    if (!supabase) {
-      setError("Authentication service not configured. Please contact support.");
+    if (!token) {
+      setError("No reset token provided.");
       return;
     }
 
@@ -43,19 +78,57 @@ export default function ResetPassword() {
     }
 
     setIsLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setIsLoading(false);
 
-    if (updateError) {
-      setError(updateError.message);
-    } else {
-      toast({
-        title: "Password updated",
-        description: "Your password has been changed. Please sign in.",
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiUrl}/api/password-reset/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, newPassword: password }),
       });
-      setLocation("/");
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to reset password");
+      } else {
+        toast({
+          title: "Password updated",
+          description: "Your password has been changed. Please sign in.",
+        });
+        setLocation("/");
+      }
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-8">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
+              <span className="text-3xl font-bold">CA</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Coopvest Africa</h1>
+          </div>
+          <Card className="border-border shadow-xl">
+            <CardContent className="py-12 text-center">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+              <p className="text-muted-foreground">Verifying reset link...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isValidToken && !error) {
+    setError("Invalid or expired reset token. Please request a new password reset link.");
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
@@ -66,14 +139,16 @@ export default function ResetPassword() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Coopvest Africa</h1>
           <p className="text-muted-foreground text-sm text-center">
-            Set a new password for your account
+            {isValidToken ? "Set a new password for your account" : "Password reset link invalid or expired"}
           </p>
         </div>
 
         <Card className="border-border shadow-xl">
           <CardHeader>
             <CardTitle>Reset your password</CardTitle>
-            <CardDescription>Choose a strong new password</CardDescription>
+            <CardDescription>
+              {email ? `Resetting password for ${email}` : "Choose a strong new password"}
+            </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
@@ -83,38 +158,50 @@ export default function ResetPassword() {
                   <span>{error}</span>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="password">New password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm">Confirm new password</Label>
-                <Input
-                  id="confirm"
-                  name="confirm"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </div>
+              {isValidToken && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">New password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="At least 8 characters"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm">Confirm new password</Label>
+                    <Input
+                      id="confirm"
+                      name="confirm"
+                      type="password"
+                      required
+                      minLength={8}
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Re-enter your password"
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Updating..." : "Set new password"}
-                {!isLoading && <ShieldCheck className="ml-2 h-4 w-4" />}
-              </Button>
+              {isValidToken ? (
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Updating..." : "Set new password"}
+                  {!isLoading && <ShieldCheck className="ml-2 h-4 w-4" />}
+                </Button>
+              ) : (
+                <Button type="button" className="w-full" onClick={() => setLocation("/")}>
+                  Go to login
+                </Button>
+              )}
             </CardFooter>
           </form>
         </Card>

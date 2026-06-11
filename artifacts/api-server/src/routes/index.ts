@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { requireAuth } from "../middleware/auth";
 import healthRouter from "./health";
 import setupRouter from "./setup";
+import passwordResetRouter from "./password_reset";
 import dashboardRouter from "./dashboard";
 import membersRouter from "./members";
 import loansRouter from "./loans";
@@ -40,6 +41,9 @@ const router: IRouter = Router();
 
 // Public — no auth required
 router.use(healthRouter);
+
+// Password reset — public endpoint
+router.use(passwordResetRouter);
 
 // Setup endpoint — no auth required (but requires setup key)
 router.use(setupRouter);
