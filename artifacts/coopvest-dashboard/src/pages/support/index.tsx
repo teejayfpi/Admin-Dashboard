@@ -96,11 +96,22 @@ export default function Support() {
     status: (status as "open" | "in_progress" | "resolved" | "closed") || undefined,
     page,
     limit: 20,
-  });
+  }, { query: { enabled: true } });
 
   const { mutate: resolve } = useResolveTicket();
   const { mutate: updateStatus } = useUpdateTicketStatus();
   const { mutate: reply, isPending: isReplying } = useReplyToTicket();
+
+  // Safely extract tickets array with defensive checks
+  const getTickets = (): any[] => {
+    try {
+      if (!data) return [];
+      const raw = (data as any)?.data;
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  };
 
   const handleResolve = (id: number) => {
     resolve(id, {
@@ -127,7 +138,7 @@ export default function Support() {
     });
   };
 
-  const tickets = data?.data && Array.isArray(data.data) ? data.data : [];
+  const tickets = getTickets();
   const filteredTickets = search 
     ? tickets.filter(t => 
         t.subject?.toLowerCase().includes(search.toLowerCase()) ||

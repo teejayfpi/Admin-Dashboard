@@ -120,8 +120,12 @@ export default function RoleManagement() {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json();
-      setAdmins(data.admins ?? []);
+      // Ensure admins is always an array
+      const adminsData = Array.isArray(data.admins) ? data.admins : [];
+      setAdmins(adminsData);
     } catch {
+      // On error, set empty array
+      setAdmins([]);
       toast({ title: "Error", description: "Failed to fetch admins", variant: "destructive" });
     } finally {
       setLoadingStaff(false);
@@ -134,8 +138,11 @@ export default function RoleManagement() {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json();
-      setRoles(data.roles ?? []);
+      // Ensure roles is always an array
+      const rolesData = Array.isArray(data.roles) ? data.roles : [];
+      setRoles(rolesData);
     } catch {
+      setRoles([]);
       toast({ title: "Error", description: "Failed to fetch roles", variant: "destructive" });
     } finally {
       setLoadingRoles(false);
@@ -148,8 +155,11 @@ export default function RoleManagement() {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json();
-      setPermissions(data.permissions ?? []);
+      // Ensure permissions is always an array
+      const permsData = Array.isArray(data.permissions) ? data.permissions : [];
+      setPermissions(permsData);
     } catch {
+      setPermissions([]);
       toast({ title: "Error", description: "Failed to fetch permissions", variant: "destructive" });
     } finally {
       setLoadingPerms(false);
