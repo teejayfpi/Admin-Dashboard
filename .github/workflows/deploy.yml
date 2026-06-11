@@ -3,6 +3,11 @@ name: Deploy to Vercel
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: coopvestafrica-ops
+  VERCEL_PROJECT_ID: coopvest-africas-projects
 
 jobs:
   deploy:
@@ -22,7 +27,7 @@ jobs:
         working-directory: artifacts/coopvest-dashboard
 
       - name: Install Vercel
-        run: npm install vercel
+        run: npm install vercel@latest
         working-directory: artifacts/coopvest-dashboard
 
       - name: Pull Vercel Environment
