@@ -69,7 +69,10 @@ function useMarkRead() {
   return useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`${BASE}/api/notifications/${id}/read`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to mark notification as read");
+      }
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
@@ -81,7 +84,10 @@ function useMarkAllRead() {
   return useMutation({
     mutationFn: async () => {
       const res = await fetch(`${BASE}/api/notifications/read-all`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to mark all notifications as read");
+      }
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),

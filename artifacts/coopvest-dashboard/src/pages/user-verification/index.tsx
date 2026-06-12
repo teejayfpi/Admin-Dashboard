@@ -74,7 +74,10 @@ const docTypeLabels: Record<DocType, string> = {
 async function fetchVerifications(params: Record<string, string>): Promise<KYCResponse> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api/verification?${qs}`);
-  if (!res.ok) throw new Error("Failed to fetch KYC records");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Failed to fetch KYC records");
+  }
   return res.json();
 }
 
@@ -88,7 +91,10 @@ async function reviewKYC(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
-  if (!res.ok) throw new Error("Review failed");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Review failed");
+  }
 }
 
 export default function UserVerification() {

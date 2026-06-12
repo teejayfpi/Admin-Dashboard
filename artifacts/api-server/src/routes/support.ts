@@ -29,7 +29,7 @@ router.get("/support-tickets", async (req, res): Promise<void> => {
   const status = req.query.status as string | undefined;
   const priority = req.query.priority as string | undefined;
 
-  let query = supabase.from("tickets").select("*, profiles!tickets_profile_id_fkey(name, user_id)", { count: "exact" });
+  let query = supabase.from("tickets").select("*, profiles!tickets_profile_id_fkey(id, first_name, last_name, name, email, user_id)", { count: "exact" });
   if (status) query = query.eq("status", status);
   if (priority) query = query.eq("priority", priority);
 
@@ -41,12 +41,13 @@ router.get("/support-tickets", async (req, res): Promise<void> => {
 
   res.json({
     data: (tickets ?? []).map(t => {
-      const profile = t.profiles as unknown as { name: string; user_id: string } | null;
+      const profile = t.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; user_id?: string } | null;
+      const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${t.profile_id?.slice(0, 8)}`;
       return {
         id: t.id,
         ticketId: t.ticket_id,
         memberId: t.profile_id,
-        memberName: profile?.name ?? "",
+        memberName,
         subject: t.subject,
         description: t.description,
         status: t.status,
@@ -64,17 +65,18 @@ router.get("/support-tickets", async (req, res): Promise<void> => {
 
 router.get("/support-tickets/:id", async (req, res): Promise<void> => {
   const id = req.params.id;
-  const { data: ticket, error } = await supabase.from("tickets").select("*, profiles!tickets_profile_id_fkey(name)").eq("id", id).single();
+  const { data: ticket, error } = await supabase.from("tickets").select("*, profiles!tickets_profile_id_fkey(id, first_name, last_name, name, email)").eq("id", id).single();
   if (error || !ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
 
   const { data: messages } = await supabase.from("ticket_messages").select("*").eq("ticket_id", ticket.id).order("created_at", { ascending: true });
 
-  const profile = ticket.profiles as unknown as { name: string } | null;
+  const profile = ticket.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${ticket.profile_id?.slice(0, 8)}`;
   res.json({
     id: ticket.id,
     ticketId: ticket.ticket_id,
     memberId: ticket.profile_id,
-    memberName: profile?.name ?? "",
+    memberName,
     subject: ticket.subject,
     description: ticket.description,
     status: ticket.status,

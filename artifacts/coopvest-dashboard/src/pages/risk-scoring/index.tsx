@@ -85,7 +85,10 @@ export default function RiskScoring() {
       const res = await fetch(`${BASE}/api/risk-scoring?limit=100`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to fetch risk scoring data");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to fetch risk scoring data");
+      }
       return res.json() as Promise<RiskResponse>;
     },
   });

@@ -200,12 +200,12 @@ router.post("/contributions", requireRole("operator", "admin", "super_admin"), a
     });
   }
 
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", memberId).single();
+  const { data: profile } = await supabase.from("profiles").select("name, first_name, last_name, email").eq("id", memberId).single();
 
   res.status(201).json({
     id: contribution.id,
     memberId: contribution.profile_id,
-    memberName: profile?.name ?? "",
+    memberName: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${memberId?.slice(0, 8)}`,
     amount: Number(contribution.amount),
     month,
     paymentMethod,

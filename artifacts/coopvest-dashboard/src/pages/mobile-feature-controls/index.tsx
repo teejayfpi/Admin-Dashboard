@@ -79,7 +79,10 @@ function useFetchFeatures() {
     queryKey: ["/api/mobile-features"],
     queryFn: async () => {
       const res = await fetch(`${BASE}/api/mobile-features`);
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to fetch features");
+      }
       return res.json();
     },
   });
@@ -92,7 +95,10 @@ function useToggleFeature() {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ featureId, enabled }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to toggle feature");
+      }
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/mobile-features"] }),

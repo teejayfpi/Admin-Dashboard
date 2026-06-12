@@ -30,7 +30,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       ...(options?.headers as Record<string, string> | undefined),
     },
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `${res.status} ${res.statusText}`);
+  }
   return res.json() as Promise<T>;
 }
 

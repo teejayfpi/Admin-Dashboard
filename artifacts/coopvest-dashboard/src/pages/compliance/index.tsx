@@ -33,7 +33,10 @@ function useUpdateKyc(action: "approve" | "reject") {
   return useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`${BASE}/api/compliance/${id}/${action}`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `Failed to ${action} KYC`);
+      }
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/compliance"] }),

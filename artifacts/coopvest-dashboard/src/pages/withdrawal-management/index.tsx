@@ -65,7 +65,10 @@ const statusConfig: Record<WithdrawalStatus, { label: string; className: string 
 async function fetchWithdrawals(params: Record<string, string>): Promise<WithdrawalsResponse> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api/withdrawals?${qs}`);
-  if (!res.ok) throw new Error("Failed to fetch withdrawals");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Failed to fetch withdrawals");
+  }
   return res.json();
 }
 
@@ -79,7 +82,10 @@ async function processWithdrawal(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
-  if (!res.ok) throw new Error("Action failed");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Action failed");
+  }
 }
 
 async function bulkApprove(ids: number[]): Promise<void> {
@@ -88,7 +94,10 @@ async function bulkApprove(ids: number[]): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids }),
   });
-  if (!res.ok) throw new Error("Bulk approve failed");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Bulk approve failed");
+  }
 }
 
 async function updateDailyLimit(limit: number): Promise<void> {
@@ -97,7 +106,10 @@ async function updateDailyLimit(limit: number): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ limit }),
   });
-  if (!res.ok) throw new Error("Failed to update limit");
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || "Failed to update limit");
+  }
 }
 
 export default function WithdrawalManagement() {

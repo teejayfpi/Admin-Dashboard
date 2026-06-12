@@ -35,7 +35,7 @@ router.get("/compliance", requireRole("viewer", "operator", "admin", "super_admi
   const status = req.query.status as string | undefined;
 
   const statusMap: Record<string, string> = { pending: "pending", approved: "verified", flagged: "in_review", rejected: "rejected" };
-  let query = supabase.from("kyc").select("*, profiles!kyc_profile_id_fkey(name, user_id)", { count: "exact" });
+  let query = supabase.from("kyc").select("*, profiles!kyc_profile_id_fkey(id, first_name, last_name, name, email, user_id)", { count: "exact" });
   if (status && statusMap[status]) query = query.eq("status", statusMap[status]);
 
   const { data: kycItems, count, error } = await query
@@ -48,11 +48,11 @@ router.get("/compliance", requireRole("viewer", "operator", "admin", "super_admi
 
   res.json({
     data: (kycItems ?? []).map(k => {
-      const profile = k.profiles as unknown as { name: string; user_id: string } | null;
+      const profile = k.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; user_id?: string } | null;
       return {
         id: k.id,
         memberId: k.profile_id,
-        memberName: profile?.name ?? "",
+        const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${k.profile_id?.slice(0, 8)}`;
         type: "KYC Verification",
         status: reverseStatusMap[k.status] ?? k.status,
         description: `KYC level ${k.verification_level ?? 0} verification`,

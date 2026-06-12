@@ -85,10 +85,11 @@ router.post("/rollovers/request", async (req, res): Promise<void> => {
 
 router.get("/rollovers/:rolloverId", async (req, res): Promise<void> => {
   const rolloverId = req.params.rolloverId;
-  const { data: rollover } = await supabase.from("rollovers").select("*, profiles!rollovers_profile_id_fkey(name)").eq("rollover_id", rolloverId).single();
+  const { data: rollover } = await supabase.from("rollovers").select("*, profiles!rollovers_profile_id_fkey(id, first_name, last_name, name, email)").eq("rollover_id", rolloverId).single();
   if (!rollover) { res.status(404).json({ success: false, message: "Rollover not found" }); return; }
 
-  const profile = rollover.profiles as unknown as { name: string } | null;
+  const profile = rollover.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${rollover.profile_id?.slice(0, 8)}`;
   res.json({
     success: true,
     rollover: {
@@ -96,7 +97,7 @@ router.get("/rollovers/:rolloverId", async (req, res): Promise<void> => {
       rolloverId: rollover.rollover_id,
       loanId: rollover.loan_id,
       memberId: rollover.profile_id,
-      memberName: profile?.name ?? "",
+      memberName,
       originalAmount: Number(rollover.original_amount),
       outstandingBalance: Number(rollover.outstanding_balance),
       rolloverFee: Number(rollover.rollover_fee),
@@ -338,7 +339,7 @@ router.get("/rollovers", async (req, res): Promise<void> => {
   const offset = (page - 1) * limit;
   const status = req.query.status as string | undefined;
 
-  let query = supabase.from("rollovers").select("*, profiles!rollovers_profile_id_fkey(name)", { count: "exact" });
+  let query = supabase.from("rollovers").select("*, profiles!rollovers_profile_id_fkey(id, first_name, last_name, name, email)", { count: "exact" });
   if (status) query = query.eq("status", status);
 
   const { data: rollovers, count, error } = await query
@@ -348,20 +349,24 @@ router.get("/rollovers", async (req, res): Promise<void> => {
   if (error) { res.status(500).json({ error: error.message }); return; }
 
   res.json({
-    data: (rollovers ?? []).map(r => ({
-      id: r.id,
-      rolloverId: r.rollover_id,
-      loanId: r.loan_id,
-      memberId: r.profile_id,
-      memberName: (r.profiles as unknown as { name: string } | null)?.name ?? "",
-      originalAmount: Number(r.original_amount),
-      outstandingBalance: Number(r.outstanding_balance),
-      rolloverFee: Number(r.rollover_fee),
-      newTenure: r.new_tenure,
-      newMonthlyPayment: r.new_monthly_payment ? Number(r.new_monthly_payment) : undefined,
-      status: r.status,
-      createdAt: r.created_at,
-    })),
+    data: (rollovers ?? []).map(r => {
+      const profile = r.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string } | null;
+      const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${r.profile_id?.slice(0, 8)}`;
+      return {
+        id: r.id,
+        rolloverId: r.rollover_id,
+        loanId: r.loan_id,
+        memberId: r.profile_id,
+        memberName,
+        originalAmount: Number(r.original_amount),
+        outstandingBalance: Number(r.outstanding_balance),
+        rolloverFee: Number(r.rollover_fee),
+        newTenure: r.new_tenure,
+        newMonthlyPayment: r.new_monthly_payment ? Number(r.new_monthly_payment) : undefined,
+        status: r.status,
+        createdAt: r.created_at,
+      };
+    }),
     total: count ?? 0,
     page,
     limit,
