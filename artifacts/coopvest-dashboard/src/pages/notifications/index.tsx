@@ -99,8 +99,16 @@ function useSendNotification() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to send notification");
-      return res.json();
+      const json = await res.json();
+      // Even if push fails, the notification is saved - consider that success
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to save notification");
+      }
+      // Check if there was a database error
+      if (json.error) {
+        throw new Error(json.error);
+      }
+      return json;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
   });
@@ -136,12 +144,16 @@ export default function Notifications() {
     sendNotification({ title, message, type: notifType, channels: selectedChannels, audience }, {
       onSuccess: () => {
         toast({
-          title: "Notification sent!",
-          description: `Sent via ${selectedChannels.join(", ")} to ${AUDIENCE_OPTIONS.find((a) => a.value === audience)?.label ?? audience}.`,
+          title: "Notification saved!",
+          description: `Notification has been recorded. Push delivery may require Firebase configuration.`,
         });
         setTitle(""); setMessage("");
       },
-      onError: () => toast({ title: "Error", description: "Failed to send notification.", variant: "destructive" }),
+      onError: (error: Error) => toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to save notification.", 
+        variant: "destructive" 
+      }),
     });
   };
 

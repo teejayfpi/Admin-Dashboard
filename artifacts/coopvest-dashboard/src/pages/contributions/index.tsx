@@ -156,16 +156,22 @@ export default function Contributions() {
           paymentMethod: singlePaymentMethod,
         }),
       });
-      if (!res.ok) throw new Error("Failed to submit");
-      toast({ title: "Success", description: `Contribution of ${formatCurrency(Number(singleAmount))} recorded for ${selectedMember.name}` });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || json.details?.memberId?.[0] || "Failed to submit");
+      }
+      const memberDisplayName = selectedMember.firstName && selectedMember.lastName 
+        ? `${selectedMember.firstName} ${selectedMember.lastName}`
+        : (selectedMember.name || selectedMember.email || "Member");
+      toast({ title: "Success", description: `Contribution of ${formatCurrency(Number(singleAmount))} recorded for ${memberDisplayName}` });
       setSingleAmount("");
       setSingleMonth("");
       setSingleMemberSearch("");
       setSelectedMember(null);
       setDialog({ type: null });
       refetch();
-    } catch {
-      toast({ title: "Error", description: "Failed to record contribution", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to record contribution", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

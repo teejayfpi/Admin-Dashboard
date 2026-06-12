@@ -41,7 +41,7 @@ router.get("/loans", async (req, res): Promise<void> => {
   const status = req.query.status as string | undefined;
   const memberId = req.query.memberId as string | undefined;
 
-  let query = supabase.from("loans").select("*, profiles!loans_profile_id_fkey(name)", { count: "exact" });
+  let query = supabase.from("loans").select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email)", { count: "exact" });
   if (status) query = query.eq("status", status === "repaid" ? "completed" : status);
   if (memberId) query = query.eq("profile_id", memberId);
 
@@ -53,10 +53,15 @@ router.get("/loans", async (req, res): Promise<void> => {
 
   res.json({
     data: (loans ?? []).map(l => {
-      const profile = l.profiles as unknown as { name: string } | null;
+      const profile = l.profiles as unknown as { name?: string; first_name?: string; last_name?: string } | null;
+      // Try different name fields in order of preference
+      let memberName = profile?.name ?? "";
+      if (!memberName && profile) {
+        memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${l.profile_id?.slice(0, 8)}`;
+      }
       return {
         id: l.id, loanId: l.loan_id, memberId: l.profile_id,
-        memberName: profile?.name ?? "",
+        memberName,
         amount: Number(l.amount), balance: Number(l.remaining_balance ?? l.amount),
         interestRate: Number(l.effective_interest_rate), tenure: l.tenure_months,
         status: l.status === "completed" ? "repaid" : l.status,
@@ -107,14 +112,18 @@ router.post("/loans/apply", async (req, res): Promise<void> => {
       await supabase.from("loan_guarantors").insert(guarantorRecords);
     }
 
-    const { data: profile } = await supabase.from("profiles").select("name").eq("id", memberId).single();
+    const { data: profile } = await supabase.from("profiles").select("name, first_name, last_name, email").eq("id", memberId).single();
+    let memberName = profile?.name ?? "";
+    if (!memberName && profile) {
+      memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${memberId?.slice(0, 8)}`;
+    }
 
     res.status(201).json({
       success: true, loanId: loan.loan_id,
       message: "Loan application submitted successfully",
       loan: {
         id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-        memberName: profile?.name ?? "", amount: Number(loan.amount),
+        memberName, amount: Number(loan.amount),
         balance: Number(loan.remaining_balance), interestRate: Number(loan.effective_interest_rate),
         tenure: loan.tenure_months, status: loan.status, purpose: loan.purpose,
         monthlyPayment: Number(loan.monthly_repayment), createdAt: loan.created_at,
@@ -149,11 +158,15 @@ router.post("/loans", async (req, res): Promise<void> => {
 
   if (error) { res.status(500).json({ error: error.message }); return; }
 
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", memberId).single();
+  const { data: profile } = await supabase.from("profiles").select("name, first_name, last_name, email").eq("id", memberId).single();
+  let memberName = profile?.name ?? "";
+  if (!memberName && profile) {
+    memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${memberId?.slice(0, 8)}`;
+  }
 
   res.status(201).json({
     id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-    memberName: profile?.name ?? "", amount: Number(loan.amount),
+    memberName, amount: Number(loan.amount),
     balance: Number(loan.remaining_balance), interestRate: Number(loan.effective_interest_rate),
     tenure: loan.tenure_months, status: loan.status, purpose: loan.purpose,
     monthlyPayment: Number(loan.monthly_repayment), createdAt: loan.created_at,
@@ -163,13 +176,17 @@ router.post("/loans", async (req, res): Promise<void> => {
 router.get("/loans/:id", async (req, res): Promise<void> => {
   const id = req.params.id;
   const { data: loan, error } = await supabase.from("loans")
-    .select("*, profiles!loans_profile_id_fkey(name)").eq("id", id).single();
+    .select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email)").eq("id", id).single();
   if (error || !loan) { res.status(404).json({ error: "Loan not found" }); return; }
 
-  const profile = loan.profiles as unknown as { name: string } | null;
+  const profile = loan.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  let memberName = profile?.name ?? "";
+  if (!memberName && profile) {
+    memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${loan.profile_id?.slice(0, 8)}`;
+  }
   res.json({
     id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-    memberName: profile?.name ?? "", amount: Number(loan.amount),
+    memberName, amount: Number(loan.amount),
     balance: Number(loan.remaining_balance ?? loan.amount),
     interestRate: Number(loan.effective_interest_rate), tenure: loan.tenure_months,
     status: loan.status === "completed" ? "repaid" : loan.status,
@@ -211,10 +228,14 @@ router.post("/loans/:id/approve", requireRole("operator"), async (req, res): Pro
     notes: `Loan approved by ${adminName}`,
   });
 
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", loan.profile_id).single();
+  const { data: profile } = await supabase.from("profiles").select("name, first_name, last_name, email").eq("id", loan.profile_id).single();
+  let memberName = profile?.name ?? "";
+  if (!memberName && profile) {
+    memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${loan.profile_id?.slice(0, 8)}`;
+  }
   res.json({
     id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-    memberName: profile?.name ?? "", amount: Number(loan.amount),
+    memberName, amount: Number(loan.amount),
     balance: Number(loan.remaining_balance ?? loan.amount),
     interestRate: Number(loan.effective_interest_rate),
     status: loan.status, approvedBy: adminName, approvedAt: now.toISOString(),
@@ -253,10 +274,14 @@ router.post("/loans/:id/reject", requireRole("operator"), async (req, res): Prom
     notes: reason.trim(),
   });
 
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", loan.profile_id).single();
+  const { data: profile } = await supabase.from("profiles").select("name, first_name, last_name, email").eq("id", loan.profile_id).single();
+  let memberName = profile?.name ?? "";
+  if (!memberName && profile) {
+    memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${loan.profile_id?.slice(0, 8)}`;
+  }
   res.json({
     id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-    memberName: profile?.name ?? "", amount: Number(loan.amount),
+    memberName, amount: Number(loan.amount),
     balance: Number(loan.remaining_balance ?? loan.amount),
     interestRate: Number(loan.effective_interest_rate),
     status: loan.status, rejectionReason: loan.rejected_reason,

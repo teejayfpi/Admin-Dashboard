@@ -46,20 +46,20 @@ router.post("/organizations", async (req, res): Promise<void> => {
     .from("organizations")
     .insert({
       name: b.name,
-      type: (b.type || "").toLowerCase(),
+      type: (b.type || b.deduction_type || "").toLowerCase(),
       contact_email: b.contactEmail,
       address: b.address,
-      status: b.status || "pending",
+      status: b.status || "active",
       member_count: 0,
       date_added: new Date().toISOString(),
     })
     .select("*")
     .single();
   if (error || !data) {
-    res.status(500).json({ error: error?.message || "Failed to create organization" });
+    res.status(500).json({ success: false, error: error?.message || "Failed to create organization" });
     return;
   }
-  res.status(201).json({ organization: toCamel(data as OrgRow) });
+  res.status(201).json({ success: true, organization: toCamel(data as OrgRow) });
 });
 
 router.put("/organizations/:id", async (req, res): Promise<void> => {

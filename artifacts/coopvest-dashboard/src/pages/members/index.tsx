@@ -59,6 +59,8 @@ export default function Members() {
   const [actionDialog, setActionDialog] = useState<{ open: boolean; memberId: string | null; action: AdminAction | null; memberName: string }>({
     open: false, memberId: null, action: null, memberName: "",
   });
+  const [addMemberDialog, setAddMemberDialog] = useState(false);
+  const [newMember, setNewMember] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [actionNote, setActionNote] = useState("");
   const [contributionMethod, setContributionMethod] = useState("monthly");
   const { toast } = useToast();
@@ -82,6 +84,29 @@ export default function Members() {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Update failed');
+    }
+
+    return response.json();
+  };
+
+  // Create new member
+  const createMember = async (memberData: { firstName: string; lastName: string; email: string; phone: string }) => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://coopvest-api-v3.onrender.com';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || '';
+
+    const response = await fetch(`${baseUrl}/api/members`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(memberData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create member');
     }
 
     return response.json();
@@ -210,6 +235,26 @@ export default function Members() {
     setActionDialog({ open: false, memberId: null, action: null, memberName: "" });
   }
 
+  async function handleAddMember() {
+    if (!newMember.firstName || !newMember.lastName || !newMember.email || !newMember.phone) {
+      toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await createMember(newMember);
+      toast({ title: "Success", description: `${newMember.firstName} ${newMember.lastName} has been added.` });
+      setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
+      setAddMemberDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["getMembers"] });
+      queryClient.invalidateQueries({ queryKey: ["getMemberStats"] });
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to add member.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   async function executeAction() {
     if (!actionDialog.memberId || !actionDialog.action) return;
     setIsProcessing(true);
@@ -291,7 +336,7 @@ export default function Members() {
             <Button size="sm" onClick={() => setLocation("/user-verification")}>
               <CheckCircle2 className="mr-2 h-4 w-4" /> Pending KYC
             </Button>
-            <Button size="sm" onClick={() => {}}>
+            <Button size="sm" onClick={() => setAddMemberDialog(true)}>
               <UserPlus className="mr-2 h-4 w-4" /> Add Member
             </Button>
           </div>
@@ -585,6 +630,59 @@ export default function Members() {
               variant={["suspend", "freeze", "restrict_loans", "downgrade", "remove_admin", "delete"].includes(actionDialog.action ?? "") ? "destructive" : "default"}
             >
               {isProcessing ? "Processing…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberDialog} onOpenChange={(o) => { if (!o) setAddMemberDialog(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>First Name *</Label>
+                <Input
+                  placeholder="John"
+                  value={newMember.firstName}
+                  onChange={(e) => setNewMember({ ...newMember, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name *</Label>
+                <Input
+                  placeholder="Doe"
+                  value={newMember.lastName}
+                  onChange={(e) => setNewMember({ ...newMember, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                placeholder="john.doe@example.com"
+                value={newMember.email}
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone *</Label>
+              <Input
+                type="tel"
+                placeholder="+2348012345678"
+                value={newMember.phone}
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddMemberDialog(false); setNewMember({ firstName: "", lastName: "", email: "", phone: "" }); }}>Cancel</Button>
+            <Button onClick={handleAddMember} disabled={isProcessing}>
+              {isProcessing ? "Adding…" : "Add Member"}
             </Button>
           </DialogFooter>
         </DialogContent>

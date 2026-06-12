@@ -34,7 +34,19 @@ router.get("/interest-rates", async (req, res): Promise<void> => {
     try {
       const rates = JSON.parse(settings.value);
       if (Array.isArray(rates)) {
-        res.json({ data: rates });
+        // Transform to match frontend schema
+        const transformed = rates.map((r: any, idx: number) => ({
+          id: r.id ?? idx + 1,
+          loanType: r.name?.toLowerCase().replace(/\s+/g, "_") ?? `loan_type_${idx}`,
+          minAmount: r.minAmount ?? r.min_amount ?? 0,
+          maxAmount: r.maxAmount ?? r.max_amount ?? 0,
+          rate: r.baseRate ?? r.rate ?? r.interest_rate ?? 0,
+          tenure: r.minTenure ?? r.tenure ?? 12,
+          description: r.name ?? "",
+          isActive: r.isActive ?? r.is_active ?? true,
+          createdAt: new Date().toISOString(),
+        }));
+        res.json({ data: transformed });
         return;
       }
     } catch {
@@ -42,11 +54,12 @@ router.get("/interest-rates", async (req, res): Promise<void> => {
     }
   }
 
+  // Return default rates matching frontend schema
   res.json({
     data: [
-      { id: "1", name: "Quick Loan", baseRate: 5.0, minTenure: 1, maxTenure: 12, minAmount: 10000, maxAmount: 500000, isActive: true },
-      { id: "2", name: "Business Loan", baseRate: 8.0, minTenure: 6, maxTenure: 24, minAmount: 50000, maxAmount: 2000000, isActive: true },
-      { id: "3", name: "Emergency Loan", baseRate: 3.5, minTenure: 1, maxTenure: 6, minAmount: 5000, maxAmount: 200000, isActive: true },
+      { id: 1, loanType: "personal", minAmount: 10000, maxAmount: 500000, rate: 5.0, tenure: 12, description: "Quick Loan", isActive: true, createdAt: new Date().toISOString() },
+      { id: 2, loanType: "business", minAmount: 50000, maxAmount: 2000000, rate: 8.0, tenure: 24, description: "Business Loan", isActive: true, createdAt: new Date().toISOString() },
+      { id: 3, loanType: "emergency", minAmount: 5000, maxAmount: 200000, rate: 3.5, tenure: 6, description: "Emergency Loan", isActive: true, createdAt: new Date().toISOString() },
     ],
   });
 });
@@ -84,7 +97,18 @@ router.post("/interest-rates", async (req, res): Promise<void> => {
     description: "Loan interest rate configurations",
   });
 
-  res.status(201).json(newRate);
+  // Return in frontend schema format
+  res.status(201).json({
+    id: rates.length,
+    loanType: name.toLowerCase().replace(/\s+/g, "_"),
+    minAmount,
+    maxAmount,
+    rate: baseRate,
+    tenure: minTenure,
+    description: name,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  });
 });
 
 router.put("/interest-rates/:id", async (req, res): Promise<void> => {
