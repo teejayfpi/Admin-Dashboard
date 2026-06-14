@@ -34742,6 +34742,46 @@ router3.post("/api/auth/verify-otp", async (req, res) => {
     res.status(500).json({ error: "Verification failed" });
   }
 });
+router3.post("/api/auth/reset-password", async (req, res) => {
+  const { email, code, new_password } = req.body;
+  if (!code) {
+    res.status(400).json({ error: "Token/code is required" });
+    return;
+  }
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+  if (!new_password) {
+    res.status(400).json({ error: "New password is required" });
+    return;
+  }
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code,
+      type: "recovery"
+    });
+    if (error) {
+      logger.error({ error: error.message }, "OTP verification failed");
+      res.status(400).json({ error: error.message || "Invalid or expired code" });
+      return;
+    }
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: new_password
+    });
+    if (updateError) {
+      logger.error({ error: updateError.message }, "Password update failed");
+      res.status(400).json({ error: updateError.message || "Failed to update password" });
+      return;
+    }
+    logger.info({ email }, "Password reset successful");
+    res.json({ success: true, message: "Password has been reset successfully" });
+  } catch (error) {
+    logger.error({ error }, "Password reset error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 var auth_default = router3;
 
 // src/routes/password_reset.ts
