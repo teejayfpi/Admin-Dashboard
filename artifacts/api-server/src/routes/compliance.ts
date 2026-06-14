@@ -49,10 +49,11 @@ router.get("/compliance", requireRole("viewer", "operator", "admin", "super_admi
   res.json({
     data: (kycItems ?? []).map(k => {
       const profile = k.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; user_id?: string } | null;
+      const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${k.profile_id?.slice(0, 8)}`;
       return {
         id: k.id,
         memberId: k.profile_id,
-        const memberName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.email || `Member ${k.profile_id?.slice(0, 8)}`;
+        memberName,
         type: "KYC Verification",
         status: reverseStatusMap[k.status] ?? k.status,
         description: `KYC level ${k.verification_level ?? 0} verification`,
