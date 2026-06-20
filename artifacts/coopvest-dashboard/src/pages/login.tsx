@@ -62,7 +62,7 @@ export default function Login() {
         .eq('id', sessionData.user.id)
         .maybeSingle();
 
-      const validAdminRoles = ['admin', 'super_admin', 'operator', 'finance', 'support'];
+      const validAdminRoles = ['admin', 'superadmin', 'staff'];
       if (!profile?.role || !validAdminRoles.includes(profile.role)) {
         // Sign out and show error
         await supabase.auth.signOut();

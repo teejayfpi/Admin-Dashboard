@@ -7,7 +7,8 @@ interface ProtectedRouteProps {
 }
 
 // Valid admin roles that can access the admin dashboard
-const VALID_ADMIN_ROLES = ['admin', 'super_admin', 'operator', 'finance', 'support'];
+// Must match backend roles in backend/src/middleware/auth.js
+const VALID_ADMIN_ROLES = ['admin', 'superadmin', 'staff'];
 
 async function checkAdminRole(userId: string): Promise<boolean> {
   if (!supabase) return false;
