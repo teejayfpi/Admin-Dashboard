@@ -13,7 +13,7 @@ export function getApiBaseUrl(): string {
     return envUrl.replace(/\/+$/, '');
   }
   // Default to production
-  return 'https://coopvest-api.onrender.com';
+  return 'https://coopvest-api-v3.onrender.com';
 }
 
 // Get the admin API URL (v2)

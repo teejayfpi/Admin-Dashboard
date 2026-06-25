@@ -1,3 +1,11 @@
+import { createRequire as __bannerCrReq } from 'node:module';
+import __bannerPath from 'node:path';
+import __bannerUrl from 'node:url';
+
+globalThis.require = __bannerCrReq(import.meta.url);
+globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
+globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
+    
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -18704,7 +18712,7 @@ var require_finalhandler = __commonJS({
     module.exports = finalhandler;
     function finalhandler(req, res, options) {
       var opts = options || {};
-      var env = opts.env || "production";
+      var env = opts.env || process.env.NODE_ENV || "development";
       var onerror = opts.onerror;
       return function(err) {
         var headers;
@@ -20642,27 +20650,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router37;
+    module.exports = Router38;
     module.exports.Route = Route;
-    function Router37(options) {
-      if (!(this instanceof Router37)) {
-        return new Router37(options);
+    function Router38(options) {
+      if (!(this instanceof Router38)) {
+        return new Router38(options);
       }
       const opts = options || {};
-      function router37(req, res, next) {
-        router37.handle(req, res, next);
+      function router38(req, res, next) {
+        router38.handle(req, res, next);
       }
-      Object.setPrototypeOf(router37, this);
-      router37.caseSensitive = opts.caseSensitive;
-      router37.mergeParams = opts.mergeParams;
-      router37.params = {};
-      router37.strict = opts.strict;
-      router37.stack = [];
-      return router37;
+      Object.setPrototypeOf(router38, this);
+      router38.caseSensitive = opts.caseSensitive;
+      router38.mergeParams = opts.mergeParams;
+      router38.params = {};
+      router38.strict = opts.strict;
+      router38.stack = [];
+      return router38;
     }
-    Router37.prototype = function() {
+    Router38.prototype = function() {
     };
-    Router37.prototype.param = function param(name, fn) {
+    Router38.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20682,7 +20690,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router37.prototype.handle = function handle(req, res, callback) {
+    Router38.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20809,7 +20817,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router37.prototype.use = function use(handler) {
+    Router38.prototype.use = function use(handler) {
       let offset = 0;
       let path2 = "/";
       if (typeof handler !== "function") {
@@ -20842,7 +20850,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router37.prototype.route = function route(path2) {
+    Router38.prototype.route = function route(path2) {
       const route2 = new Route(path2);
       const layer = new Layer(path2, {
         sensitive: this.caseSensitive,
@@ -20857,7 +20865,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router37.prototype[method] = function(path2) {
+      Router38.prototype[method] = function(path2) {
         const route = this.route(path2);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21040,13 +21048,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router37 = require_router();
+    var Router38 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router37 = null;
+      var router38 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21055,18 +21063,18 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router37 === null) {
-            router37 = new Router37({
+          if (router38 === null) {
+            router38 = new Router38({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router37;
+          return router38;
         }
       });
     };
     app2.defaultConfiguration = function defaultConfiguration() {
-      var env = "production";
+      var env = process.env.NODE_ENV || "development";
       this.enable("x-powered-by");
       this.set("etag", "weak");
       this.set("env", env);
@@ -21132,15 +21140,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router37 = this.router;
+      var router38 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router37.use(path2, fn2);
+          return router38.use(path2, fn2);
         }
         debug(".use app under %s", path2);
         fn2.mountpath = path2;
         fn2.parent = this;
-        router37.use(path2, function mounted_app(req, res, next) {
+        router38.use(path2, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23713,7 +23721,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router37 = require_router();
+    var Router38 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23735,8 +23743,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router37.Route;
-    exports.Router = Router37;
+    exports.Route = Router38.Route;
+    exports.Router = Router38;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -28129,7 +28137,17 @@ var require_multistream = __commonJS({
 // ../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/pino.js
 var require_pino = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/pino.js"(exports, module) {
-    "use strict";
+    function pinoBundlerAbsolutePath(p) {
+      try {
+        const path2 = __require("path");
+        const outputDir = "/workspace/project/Admin-Dashboard/artifacts/api-server/dist";
+        return path2.resolve(outputDir, p.replace(/^\.\//, ""));
+      } catch (e) {
+        const f = new Function("p", "return new URL(p, import.meta.url).pathname");
+        return f(p);
+      }
+    }
+    globalThis.__bundlerPathsOverrides = { ...globalThis.__bundlerPathsOverrides || {}, "thread-stream-worker": pinoBundlerAbsolutePath("./thread-stream-worker.mjs"), "pino-worker": pinoBundlerAbsolutePath("./pino-worker.mjs"), "pino/file": pinoBundlerAbsolutePath("./pino-file.mjs"), "pino-pretty": pinoBundlerAbsolutePath("./pino-pretty.mjs") };
     var os = __require("node:os");
     var stdSerializers = require_pino_std_serializers();
     var caller = require_caller();
@@ -28585,7 +28603,7 @@ var require_logger = __commonJS({
 });
 
 // src/app.ts
-var import_express37 = __toESM(require_express2(), 1);
+var import_express38 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -29904,7 +29922,7 @@ var lib_default = rateLimit;
 var import_pino_http = __toESM(require_logger(), 1);
 
 // src/routes/index.ts
-var import_express36 = __toESM(require_express2(), 1);
+var import_express37 = __toESM(require_express2(), 1);
 
 // ../../lib/db/src/index.ts
 import { createClient } from "@supabase/supabase-js";
@@ -34653,7 +34671,7 @@ var import_express3 = __toESM(require_express2(), 1);
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
-var isProduction = true;
+var isProduction = process.env.NODE_ENV === "production";
 var logger = (0, import_pino.default)({
   level: process.env.LOG_LEVEL ?? "info",
   redact: [
@@ -34742,46 +34760,6 @@ router3.post("/api/auth/verify-otp", async (req, res) => {
     res.status(500).json({ error: "Verification failed" });
   }
 });
-router3.post("/api/auth/reset-password", async (req, res) => {
-  const { email, code, new_password } = req.body;
-  if (!code) {
-    res.status(400).json({ error: "Token/code is required" });
-    return;
-  }
-  if (!email) {
-    res.status(400).json({ error: "Email is required" });
-    return;
-  }
-  if (!new_password) {
-    res.status(400).json({ error: "New password is required" });
-    return;
-  }
-  try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: code,
-      type: "recovery"
-    });
-    if (error) {
-      logger.error({ error: error.message }, "OTP verification failed");
-      res.status(400).json({ error: error.message || "Invalid or expired code" });
-      return;
-    }
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: new_password
-    });
-    if (updateError) {
-      logger.error({ error: updateError.message }, "Password update failed");
-      res.status(400).json({ error: updateError.message || "Failed to update password" });
-      return;
-    }
-    logger.info({ email }, "Password reset successful");
-    res.json({ success: true, message: "Password has been reset successfully" });
-  } catch (error) {
-    logger.error({ error }, "Password reset error");
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 var auth_default = router3;
 
 // src/routes/password_reset.ts
@@ -34816,7 +34794,10 @@ router4.post("/api/password-reset/request", async (req, res) => {
       success: true,
       message: "If an account exists with this email, a password reset link has been sent.",
       // In development, include the token for testing
-      ...false
+      ...process.env.NODE_ENV === "development" && {
+        devToken: token,
+        devResetLink: `https://admin-dashboard-api-server.vercel.app/reset-password?token=${token}`
+      }
     });
   } catch (error) {
     logger.error({ error }, "Password reset request failed");
@@ -39376,54 +39357,246 @@ router35.delete("/excel-uploads/:id", requireAuth, async (req, res) => {
 });
 var excel_uploads_default = router35;
 
-// src/routes/index.ts
+// src/routes/deposits.ts
+var import_express36 = __toESM(require_express2(), 1);
 var router36 = (0, import_express36.Router)();
-router36.use(health_default);
-router36.use(auth_default);
-router36.use(password_reset_default);
-router36.use(setup_default);
 router36.use(requireAuth);
-router36.use(dashboard_default);
-router36.use(members_default);
-router36.use(loans_default);
-router36.use(contributions_default);
-router36.use(investments_default);
-router36.use(compliance_default);
-router36.use(notifications_default);
-router36.use(audit_logs_default);
-router36.use(support_default);
-router36.use(risk_scoring_default);
-router36.use(interest_rates_default);
-router36.use(rollovers_default);
-router36.use(payroll_default);
-router36.use(mobile_features_default);
-router36.use(roles_default);
-router36.use(fraud_detection_default);
-router36.use(organizations_default);
-router36.use(analytics_default);
-router36.use(security_default);
-router36.use(wallets_default);
-router36.use(withdrawals_default);
-router36.use(verification_default);
-router36.use(referrals_default);
-router36.use(guarantors_default);
-router36.use(system_default);
-router36.use(reports_default);
-router36.use(sessions_default);
-router36.use(bulk_default);
-router36.use(reconciliation_default);
-router36.use(login_history_default);
-router36.use(excel_uploads_default);
-var routes_default = router36;
+router36.get("/deposits", requireRole("viewer", "operator", "admin", "super_admin"), async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Number(req.query.limit) || 20);
+  const offset = (page - 1) * limit;
+  const status = req.query.status;
+  const memberId = req.query.memberId;
+  let query = supabase.from("deposit_requests").select(`
+      id,
+      profile_id,
+      amount,
+      currency,
+      status,
+      payment_proof_url,
+      payment_reference,
+      payment_date,
+      bank_name,
+      sender_account_name,
+      sender_account_number,
+      admin_notes,
+      verified_by,
+      verified_at,
+      created_at,
+      updated_at,
+      profiles!deposit_requests_profile_id_fkey(name, first_name, last_name, email, phone)
+    `, { count: "exact" });
+  if (status) query = query.eq("status", status);
+  if (memberId) query = query.eq("profile_id", memberId);
+  const { data: rows, count, error } = await query.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+  if (error) {
+    console.error("Error fetching deposits:", error);
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  res.json({
+    data: (rows ?? []).map((r) => ({
+      id: r.id,
+      profileId: r.profile_id,
+      memberName: (r.profiles ?? {}).name || [(r.profiles ?? {}).first_name, (r.profiles ?? {}).last_name].filter(Boolean).join(" ") || (r.profiles ?? {}).email || "Unknown",
+      memberEmail: (r.profiles ?? {}).email || null,
+      memberPhone: (r.profiles ?? {}).phone || null,
+      amount: Number(r.amount),
+      currency: r.currency || "NGN",
+      status: r.status,
+      paymentProofUrl: r.payment_proof_url,
+      paymentReference: r.payment_reference,
+      paymentDate: r.payment_date,
+      bankName: r.bank_name,
+      senderAccountName: r.sender_account_name,
+      senderAccountNumber: r.sender_account_number,
+      adminNotes: r.admin_notes,
+      verifiedBy: r.verified_by,
+      verifiedAt: r.verified_at,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    })),
+    total: count ?? 0,
+    page,
+    limit
+  });
+});
+router36.get("/deposits/summary", requireRole("viewer", "operator", "admin", "super_admin"), async (req, res) => {
+  const { count: pendingCount } = await supabase.from("deposit_requests").select("*", { count: "exact", head: true }).eq("status", "pending");
+  const { count: verifiedCount } = await supabase.from("deposit_requests").select("*", { count: "exact", head: true }).eq("status", "verified");
+  const { count: rejectedCount } = await supabase.from("deposit_requests").select("*", { count: "exact", head: true }).eq("status", "rejected");
+  const { data: pendingRows } = await supabase.from("deposit_requests").select("amount").eq("status", "pending");
+  const { data: verifiedRows } = await supabase.from("deposit_requests").select("amount").eq("status", "verified");
+  const pendingAmount = (pendingRows ?? []).reduce((s, r) => s + Number(r.amount || 0), 0);
+  const verifiedAmount = (verifiedRows ?? []).reduce((s, r) => s + Number(r.amount || 0), 0);
+  res.json({
+    pendingCount: pendingCount ?? 0,
+    verifiedCount: verifiedCount ?? 0,
+    rejectedCount: rejectedCount ?? 0,
+    pendingAmount,
+    verifiedAmount,
+    totalCount: (pendingCount ?? 0) + (verifiedCount ?? 0) + (rejectedCount ?? 0)
+  });
+});
+router36.patch("/deposits/:id/verify", requireRole("operator", "admin", "super_admin"), async (req, res) => {
+  const { id } = req.params;
+  const { adminNotes } = req.body;
+  const authHeader = req.headers.authorization;
+  let adminProfileId = null;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    try {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      adminProfileId = user?.id ?? null;
+    } catch {
+    }
+  }
+  const { data: deposit, error: fetchError } = await supabase.from("deposit_requests").select("*, profiles!deposit_requests_profile_id_fkey(name)").eq("id", id).single();
+  if (fetchError || !deposit) {
+    res.status(404).json({ error: "Deposit request not found" });
+    return;
+  }
+  const { data: updated, error: updateError } = await supabase.from("deposit_requests").update({
+    status: "verified",
+    verified_by: adminProfileId,
+    verified_at: (/* @__PURE__ */ new Date()).toISOString(),
+    admin_notes: adminNotes || null
+  }).eq("id", id).select().single();
+  if (updateError) {
+    res.status(500).json({ error: updateError.message });
+    return;
+  }
+  if (deposit.transaction_id) {
+    await supabase.from("transactions").update({ status: "completed" }).eq("id", deposit.transaction_id);
+  }
+  const memberProfileId = deposit.profile_id;
+  const amount = Number(deposit.amount);
+  const { data: existingSavings } = await supabase.from("savings").select("id, total_saved, consecutive_months").eq("profile_id", memberProfileId).maybeSingle();
+  const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+  if (existingSavings) {
+    await supabase.from("savings").update({
+      total_saved: Number(existingSavings.total_saved || 0) + amount,
+      monthly_savings: amount,
+      last_savings_date: nowIso,
+      consecutive_months: Number(existingSavings.consecutive_months || 0) + 1,
+      updated_at: nowIso
+    }).eq("id", existingSavings.id);
+  } else {
+    await supabase.from("savings").insert({
+      profile_id: memberProfileId,
+      total_saved: amount,
+      monthly_savings: amount,
+      first_savings_date: nowIso,
+      last_savings_date: nowIso,
+      consecutive_months: 1
+    });
+  }
+  const { data: wallet } = await supabase.from("wallets").select("id, balance").eq("profile_id", memberProfileId).maybeSingle();
+  if (wallet) {
+    await supabase.from("wallets").update({
+      balance: Number(wallet.balance || 0) + amount,
+      last_updated: nowIso
+    }).eq("id", wallet.id);
+  }
+  res.json({
+    success: true,
+    message: "Deposit verified successfully",
+    deposit: updated
+  });
+});
+router36.patch("/deposits/:id/reject", requireRole("operator", "admin", "super_admin"), async (req, res) => {
+  const { id } = req.params;
+  const { adminNotes } = req.body;
+  const authHeader = req.headers.authorization;
+  let adminProfileId = null;
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    try {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      adminProfileId = user?.id ?? null;
+    } catch {
+    }
+  }
+  const { data: updated, error: updateError } = await supabase.from("deposit_requests").update({
+    status: "rejected",
+    verified_by: adminProfileId,
+    verified_at: (/* @__PURE__ */ new Date()).toISOString(),
+    admin_notes: adminNotes || null
+  }).eq("id", id).select().single();
+  if (updateError) {
+    res.status(500).json({ error: updateError.message });
+    return;
+  }
+  res.json({
+    success: true,
+    message: "Deposit rejected",
+    deposit: updated
+  });
+});
+router36.patch("/deposits/:id/cancel", requireRole("operator", "admin", "super_admin"), async (req, res) => {
+  const { id } = req.params;
+  const { data: updated, error } = await supabase.from("deposit_requests").update({ status: "cancelled" }).eq("id", id).select().single();
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+  res.json({
+    success: true,
+    message: "Deposit cancelled",
+    deposit: updated
+  });
+});
+var deposits_default = router36;
+
+// src/routes/index.ts
+var router37 = (0, import_express37.Router)();
+router37.use(health_default);
+router37.use(auth_default);
+router37.use(password_reset_default);
+router37.use(setup_default);
+router37.use(requireAuth);
+router37.use(dashboard_default);
+router37.use(members_default);
+router37.use(loans_default);
+router37.use(contributions_default);
+router37.use(investments_default);
+router37.use(compliance_default);
+router37.use(notifications_default);
+router37.use(audit_logs_default);
+router37.use(support_default);
+router37.use(risk_scoring_default);
+router37.use(interest_rates_default);
+router37.use(rollovers_default);
+router37.use(payroll_default);
+router37.use(mobile_features_default);
+router37.use(roles_default);
+router37.use(fraud_detection_default);
+router37.use(organizations_default);
+router37.use(analytics_default);
+router37.use(security_default);
+router37.use(wallets_default);
+router37.use(withdrawals_default);
+router37.use(verification_default);
+router37.use(referrals_default);
+router37.use(guarantors_default);
+router37.use(system_default);
+router37.use(reports_default);
+router37.use(sessions_default);
+router37.use(bulk_default);
+router37.use(reconciliation_default);
+router37.use(login_history_default);
+router37.use(excel_uploads_default);
+router37.use(deposits_default);
+var routes_default = router37;
 
 // src/app.ts
-if (!process.env.ALLOWED_ORIGIN) {
+if (process.env.NODE_ENV === "production" && !process.env.ALLOWED_ORIGIN) {
   logger.fatal(
     "ALLOWED_ORIGIN environment variable is not set. Refusing to start in production with a wildcard CORS origin. Set ALLOWED_ORIGIN to your frontend URL (e.g. https://app.coopvest.africa)."
   );
   process.exit(1);
 }
-var app = (0, import_express37.default)();
+var app = (0, import_express38.default)();
 app.use(helmet());
 app.use(
   (0, import_cors.default)({
@@ -39453,8 +39626,8 @@ app.use(
     }
   })
 );
-app.use(import_express37.default.json({ limit: "100kb" }));
-app.use(import_express37.default.urlencoded({ limit: "100kb", extended: true }));
+app.use(import_express38.default.json({ limit: "100kb" }));
+app.use(import_express38.default.urlencoded({ limit: "100kb", extended: true }));
 app.use("/api", routes_default);
 app.use((err, req, res, next) => {
   logger.error({ err }, "Unhandled error");
