@@ -5,9 +5,9 @@
   "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
   "framework": "vite",
   "routes": [
-    { "src": "/api/v1/admin/(.*)", "dest": "https://coopvest-api.onrender.com/api/v1/admin/$1" },
-    { "src": "/api/v2/admin/(.*)", "dest": "https://coopvest-api.onrender.com/api/v2/admin/$1" },
-    { "src": "/api/(.*)", "dest": "https://coopvest-api.onrender.com/api/v2/admin/$1" },
+    { "src": "/api/v1/admin/(.*)", "dest": "https://coopvest-api-v3.onrender.com/api/v1/admin/$1" },
+    { "src": "/api/v2/admin/(.*)", "dest": "https://coopvest-api-v3.onrender.com/api/v2/admin/$1" },
+    { "src": "/api/(.*)", "dest": "https://coopvest-api-v3.onrender.com/api/$1" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
