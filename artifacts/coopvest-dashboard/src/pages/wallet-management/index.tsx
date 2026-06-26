@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import {
   Wallet,
@@ -309,7 +309,7 @@ export default function WalletManagement() {
                             </span>
                           </td>
                           <td className="py-3 text-muted-foreground text-xs">
-                            <div>{new Date(wallet.lastTransactionAt).toLocaleDateString()}</div>
+                            <div>{formatDateTime(wallet.lastTransactionAt)}</div>
                             <div>{formatCurrency(wallet.lastTransactionAmount)}</div>
                           </td>
                           <td className="py-3">

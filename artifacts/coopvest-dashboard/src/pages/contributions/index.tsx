@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetContributions, useGetContributionSummary, useGetMonthlyContributions, useGetDeposits, useGetDepositSummary, useVerifyDeposit, useRejectDeposit } from "@/lib/api-client";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import { Search, Wallet, TrendingUp, CheckCircle, AlertCircle, XCircle, Download, Upload, RefreshCw, PlusCircle, FileSpreadsheet, ArrowDownUp, Banknote, Clock, Check, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -326,7 +326,7 @@ export default function Contributions() {
                                   <Badge className={statusColors[c.status] ?? ""} variant="outline">{c.status}</Badge>
                                 </td>
                                 <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-NG") : "—"}
+                                  {formatDateTime(c.createdAt)}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <div className="flex justify-center gap-1">
@@ -552,7 +552,7 @@ export default function Contributions() {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-xs text-muted-foreground">
-                                {new Date(deposit.createdAt).toLocaleDateString()}
+                                {formatDateTime(deposit.createdAt)}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-1">

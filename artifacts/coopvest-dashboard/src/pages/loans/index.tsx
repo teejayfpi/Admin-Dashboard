@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGetLoans, useApproveLoan, useRejectLoan, useGetLoanPortfolioSummary } from "@/lib/api-client";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import {
   Search, CheckCircle, XCircle, Clock, AlertTriangle, CreditCard,
   ShieldAlert, Lock, Plus, Download, MoreVertical, Users, TrendingUp,
@@ -275,7 +275,7 @@ export default function Loans() {
                             {loan.purpose ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                            {loan.createdAt ? new Date(loan.createdAt).toLocaleDateString("en-NG") : "—"}
+                            {formatDateTime(loan.createdAt)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <DropdownMenu>
@@ -364,7 +364,7 @@ export default function Loans() {
                 { label: "Purpose",        value: selectedLoan.purpose ?? "—" },
                 { label: "Status",         value: <Badge className={statusCfg[selectedLoan.status]?.cls} variant="outline">{statusCfg[selectedLoan.status]?.label}</Badge> },
                 { label: "Monthly Payment",value: selectedLoan.monthlyPayment ? formatCurrency(selectedLoan.monthlyPayment) : "—" },
-                { label: "Due Date",       value: selectedLoan.dueDate ? new Date(selectedLoan.dueDate).toLocaleDateString("en-NG") : "—" },
+                { label: "Due Date",       value: formatDateTime(selectedLoan.dueDate) },
               ].map(item => (
                 <div key={item.label} className="rounded-lg border p-3">
                   <div className="text-xs text-muted-foreground">{item.label}</div>

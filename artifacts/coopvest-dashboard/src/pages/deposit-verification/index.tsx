@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import {
   CheckCircle2,
   XCircle,
@@ -340,7 +340,7 @@ export default function DepositVerification() {
                             {deposit.payment_reference || "—"}
                           </td>
                           <td className="py-3 text-xs text-muted-foreground">
-                            {new Date(deposit.created_at).toLocaleDateString()}
+                            {formatDateTime(deposit.created_at)}
                           </td>
                           <td className="py-3">
                             <Badge variant="outline" className={cfg.className}>
