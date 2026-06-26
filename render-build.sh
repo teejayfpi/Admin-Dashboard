@@ -3,7 +3,8 @@ set -euo pipefail
 
 echo "Installing pnpm..."
 rm -rf .pnpm_bin
-npm install -g pnpm@9.15.4
+npm install --prefix .pnpm_bin pnpm@9.15.4 --force
+export PATH="$PWD/.pnpm_bin/node_modules/.bin:$PATH"
 pnpm --version
 
 echo "Installing dependencies..."
