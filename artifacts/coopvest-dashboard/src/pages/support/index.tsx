@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useGetSupportTickets } from "@/lib/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, LifeBuoy, CheckCircle, Clock, AlertTriangle, MessageSquare, Eye, Send, User, Calendar, ChevronRight } from "lucide-react";
+import { Search, LifeBuoy, CheckCircle, Clock, AlertTriangle, MessageSquare, Eye, Send, User, Calendar, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { soundService } from "@/lib/sound";
 
 const BASE = import.meta.env.VITE_API_URL || "";
 
@@ -90,6 +91,8 @@ export default function Support() {
   const [page, setPage] = useState(1);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [replyMessage, setReplyMessage] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const previousTicketCount = useRef(0);
   const { toast } = useToast();
 
   const { data, isLoading } = useGetSupportTickets({
@@ -101,6 +104,22 @@ export default function Support() {
   const { mutate: resolve } = useResolveTicket();
   const { mutate: updateStatus } = useUpdateTicketStatus();
   const { mutate: reply, isPending: isReplying } = useReplyToTicket();
+
+  // Play sound when new tickets arrive
+  useEffect(() => {
+    const tickets = getTickets();
+    if (tickets.length > previousTicketCount.current && previousTicketCount.current > 0) {
+      const hasUrgent = tickets.some(t => t.priority === 'urgent');
+      if (soundEnabled) {
+        if (hasUrgent) {
+          soundService.playUrgentSound();
+        } else {
+          soundService.playNewTicketSound();
+        }
+      }
+    }
+    previousTicketCount.current = tickets.length;
+  }, [data, soundEnabled]);
 
   // Safely extract tickets array with defensive checks
   const getTickets = (): any[] => {
@@ -160,9 +179,22 @@ export default function Support() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Complaints Management</h1>
-          <p className="text-muted-foreground">Manage member complaints and support requests</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Complaints Management</h1>
+            <p className="text-muted-foreground">Manage member complaints and support requests</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSoundEnabled(!soundEnabled);
+              soundService.setSoundEnabled(!soundEnabled);
+            }}
+          >
+            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            <span className="ml-2">{soundEnabled ? "Sound On" : "Sound Off"}</span>
+          </Button>
         </div>
 
         {/* Stats Cards */}
