@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   Search, CheckCircle, XCircle, Clock, AlertTriangle, CreditCard,
   ShieldAlert, Lock, Plus, Download, MoreVertical, Users, TrendingUp,
-  TrendingDown, RefreshCw, Banknote, FileWarning, HandshakeIcon
+  TrendingDown, RefreshCw, Banknote, FileWarning, HandshakeIcon, Phone, Mail, User
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -24,11 +24,23 @@ import { useToast } from "@/hooks/use-toast";
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LoanAction = "approve" | "reject" | "freeze" | "penalty" | "guarantor" | "restructure";
 
+interface Guarantor {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  consentedAt: string | null;
+  createdAt: string;
+}
+
 interface ApiLoan {
   id: string;
   loanId: string | null;
   memberId: string | null;
   memberName: string;
+  memberPhone: string | null;
+  memberEmail: string | null;
   amount: number;
   balance: number;
   interestRate: number;
@@ -41,6 +53,7 @@ interface ApiLoan {
   nextPaymentDate: string | null;
   rejectionReason: string | null;
   createdAt: string;
+  guarantors: Guarantor[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -358,6 +371,77 @@ export default function Loans() {
                   <div className="font-semibold mt-0.5">{item.value}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Borrower Contact Information */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <User className="h-4 w-4" /> Borrower Information
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Name</div>
+                  <div className="font-medium">{selectedLoan.memberName}</div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="text-xs text-muted-foreground">Member ID</div>
+                  <div className="font-medium text-xs">{selectedLoan.memberId || "—"}</div>
+                </div>
+                {selectedLoan.memberPhone && (
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> Phone</div>
+                    <div className="font-medium">{selectedLoan.memberPhone}</div>
+                  </div>
+                )}
+                {selectedLoan.memberEmail && (
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email</div>
+                    <div className="font-medium text-xs">{selectedLoan.memberEmail}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Guarantors Section */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Users className="h-4 w-4" /> Guarantors ({selectedLoan.guarantors?.length || 0})
+              </h4>
+              {selectedLoan.guarantors && selectedLoan.guarantors.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedLoan.guarantors.map((guarantor, idx) => (
+                    <div key={guarantor.id || idx} className="rounded-lg border p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {guarantor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-sm">{guarantor.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            {guarantor.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{guarantor.phone}</span>}
+                            {guarantor.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{guarantor.email}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge className={
+                        guarantor.status === "confirmed" || guarantor.status === "consented" || guarantor.status === "active"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : guarantor.status === "pending" || guarantor.status === "scanned"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-gray-100 text-gray-600"
+                      } variant="outline">
+                        {guarantor.status || "pending"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-4 border rounded-lg">
+                  No guarantors registered yet
+                </div>
+              )}
             </div>
 
 

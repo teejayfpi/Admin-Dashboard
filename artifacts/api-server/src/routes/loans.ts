@@ -41,7 +41,7 @@ router.get("/loans", async (req, res): Promise<void> => {
   const status = req.query.status as string | undefined;
   const memberId = req.query.memberId as string | undefined;
 
-  let query = supabase.from("loans").select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email)", { count: "exact" });
+  let query = supabase.from("loans").select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email, phone)", { count: "exact" });
   if (status) query = query.eq("status", status === "repaid" ? "completed" : status);
   if (memberId) query = query.eq("profile_id", memberId);
 
@@ -51,9 +51,40 @@ router.get("/loans", async (req, res): Promise<void> => {
 
   if (error) { res.status(500).json({ error: error.message }); return; }
 
+  // Fetch guarantors for all loans
+  const loanIds = (loans ?? []).map((l: any) => l.id);
+  let guarantorsMap: Record<string, any[]> = {};
+  
+  if (loanIds.length > 0) {
+    const { data: guarantors } = await supabase
+      .from("loan_guarantors")
+      .select("*, guarantor_profile:profiles!loan_guarantors_guarantor_id_fkey(id, name, first_name, last_name, email, phone)")
+      .in("loan_id", loanIds);
+    
+    if (guarantors) {
+      for (const g of guarantors) {
+        if (!guarantorsMap[g.loan_id]) guarantorsMap[g.loan_id] = [];
+        const guarantorProfile = g.guarantor_profile as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; phone?: string } | null;
+        let guarantorName = guarantorProfile?.name ?? "";
+        if (!guarantorName && guarantorProfile) {
+          guarantorName = [guarantorProfile.first_name, guarantorProfile.last_name].filter(Boolean).join(" ") || guarantorProfile.email || "Unknown";
+        }
+        guarantorsMap[g.loan_id].push({
+          id: g.id,
+          name: guarantorName,
+          email: guarantorProfile?.email ?? null,
+          phone: guarantorProfile?.phone ?? null,
+          status: g.status,
+          consentedAt: g.consented_at ?? null,
+          createdAt: g.created_at,
+        });
+      }
+    }
+  }
+
   res.json({
     data: (loans ?? []).map(l => {
-      const profile = l.profiles as unknown as { name?: string; first_name?: string; last_name?: string } | null;
+      const profile = l.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; phone?: string } | null;
       // Try different name fields in order of preference
       let memberName = profile?.name ?? "";
       if (!memberName && profile) {
@@ -62,6 +93,8 @@ router.get("/loans", async (req, res): Promise<void> => {
       return {
         id: l.id, loanId: l.loan_id, memberId: l.profile_id,
         memberName,
+        memberPhone: profile?.phone ?? null,
+        memberEmail: profile?.email ?? null,
         amount: Number(l.amount), balance: Number(l.remaining_balance ?? l.amount),
         interestRate: Number(l.effective_interest_rate), tenure: l.tenure_months,
         status: l.status === "completed" ? "repaid" : l.status,
@@ -70,6 +103,7 @@ router.get("/loans", async (req, res): Promise<void> => {
         monthlyPayment: l.monthly_repayment ? Number(l.monthly_repayment) : undefined,
         nextPaymentDate: l.next_due_date ?? null,
         rejectionReason: l.rejected_reason ?? null, createdAt: l.created_at,
+        guarantors: guarantorsMap[l.id] ?? [],
       };
     }),
     total: count ?? 0, page, limit,
@@ -176,17 +210,43 @@ router.post("/loans", async (req, res): Promise<void> => {
 router.get("/loans/:id", async (req, res): Promise<void> => {
   const id = req.params.id;
   const { data: loan, error } = await supabase.from("loans")
-    .select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email)").eq("id", id).single();
+    .select("*, profiles!loans_profile_id_fkey(id, first_name, last_name, name, email, phone)").eq("id", id).single();
   if (error || !loan) { res.status(404).json({ error: "Loan not found" }); return; }
 
-  const profile = loan.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  // Fetch guarantors for this loan
+  const { data: guarantors } = await supabase
+    .from("loan_guarantors")
+    .select("*, guarantor_profile:profiles!loan_guarantors_guarantor_id_fkey(id, name, first_name, last_name, email, phone)")
+    .eq("loan_id", id);
+  
+  const guarantorsList = (guarantors ?? []).map((g: any) => {
+    const guarantorProfile = g.guarantor_profile as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; phone?: string } | null;
+    let guarantorName = guarantorProfile?.name ?? "";
+    if (!guarantorName && guarantorProfile) {
+      guarantorName = [guarantorProfile.first_name, guarantorProfile.last_name].filter(Boolean).join(" ") || guarantorProfile.email || "Unknown";
+    }
+    return {
+      id: g.id,
+      name: guarantorName,
+      email: guarantorProfile?.email ?? null,
+      phone: guarantorProfile?.phone ?? null,
+      status: g.status,
+      consentedAt: g.consented_at ?? null,
+      createdAt: g.created_at,
+    };
+  });
+
+  const profile = loan.profiles as unknown as { name?: string; first_name?: string; last_name?: string; email?: string; phone?: string } | null;
   let memberName = profile?.name ?? "";
   if (!memberName && profile) {
     memberName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || `Member ${loan.profile_id?.slice(0, 8)}`;
   }
   res.json({
     id: loan.id, loanId: loan.loan_id, memberId: loan.profile_id,
-    memberName, amount: Number(loan.amount),
+    memberName,
+    memberPhone: profile?.phone ?? null,
+    memberEmail: profile?.email ?? null,
+    amount: Number(loan.amount),
     balance: Number(loan.remaining_balance ?? loan.amount),
     interestRate: Number(loan.effective_interest_rate), tenure: loan.tenure_months,
     status: loan.status === "completed" ? "repaid" : loan.status,
@@ -195,6 +255,7 @@ router.get("/loans/:id", async (req, res): Promise<void> => {
     monthlyPayment: loan.monthly_repayment ? Number(loan.monthly_repayment) : undefined,
     nextPaymentDate: loan.next_due_date ?? null,
     rejectionReason: loan.rejected_reason ?? null, createdAt: loan.created_at,
+    guarantors: guarantorsList,
   });
 });
 
