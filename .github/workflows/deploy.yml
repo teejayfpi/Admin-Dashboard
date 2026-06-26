@@ -38,9 +38,9 @@ jobs:
         run: |
           unset VERCEL_ORG_ID
           unset VERCEL_PROJECT_ID
-          rm -rf artifacts/coopvest-dashboard/dist artifacts/coopvest-dashboard/.vercel/output
+          rm -rf dist .vercel/output
           npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: .
+        working-directory: artifacts/coopvest-dashboard
 
       - name: Deploy to Vercel
         run: |
