@@ -366,4 +366,475 @@ router.get("/loans/:id/audit", async (req, res): Promise<void> => {
   res.json({ logs: logs ?? [] });
 });
 
+// Get guarantors for a loan
+router.get("/loans/:id/guarantors", async (req, res): Promise<void> => {
+  const loanId = req.params.id;
+  
+  // Get the loan to verify it exists
+  const { data: loan, error: loanError } = await supabase
+    .from("loans")
+    .select("id, loan_id, profile_id")
+    .eq("id", loanId)
+    .single();
+  
+  if (loanError || !loan) {
+    res.status(404).json({ error: "Loan not found" });
+    return;
+  }
+
+  // Get guarantors for this loan
+  const { data: guarantors, error } = await supabase
+    .from("loan_guarantors")
+    .select("*, profiles!loan_guarantors_guarantor_id_fkey(id, name, email, phone)")
+    .eq("loan_id", loan.id);
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  // Get borrower profile
+  const { data: borrower } = await supabase
+    .from("profiles")
+    .select("id, name, email")
+    .eq("id", loan.profile_id)
+    .single();
+
+  res.json({
+    loanId: loan.id,
+    loanNumber: loan.loan_id,
+    borrowerName: borrower?.name || borrower?.email || "Unknown",
+    guarantors: (guarantors ?? []).map(g => ({
+      id: g.id,
+      guarantorId: g.guarantor_id,
+      guarantorName: g.profiles?.name || g.profiles?.email || "Unknown",
+      guarantorEmail: g.profiles?.email,
+      guarantorPhone: g.profiles?.phone,
+      status: g.status,
+      consentedAt: g.consented_at,
+      createdAt: g.created_at,
+    })),
+  });
+});
+
+// Confirm guarantee (guarantor accepts the request)
+router.post("/loans/:id/guarantors/confirm", async (req, res): Promise<void> => {
+  const loanId = req.params.id;
+  const { guarantorId, consentToken } = req.body;
+
+  if (!guarantorId) {
+    res.status(400).json({ error: "guarantorId is required" });
+    return;
+  }
+
+  try {
+    // Get the loan
+    const { data: loan, error: loanError } = await supabase
+      .from("loans")
+      .select("id, loan_id, amount, profile_id")
+      .eq("id", loanId)
+      .single();
+
+    if (loanError || !loan) {
+      res.status(404).json({ error: "Loan not found" });
+      return;
+    }
+
+    // Get the guarantor profile
+    const { data: guarantorProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, name, email, phone")
+      .eq("id", guarantorId)
+      .single();
+
+    if (profileError || !guarantorProfile) {
+      res.status(404).json({ error: "Guarantor not found" });
+      return;
+    }
+
+    // Find or create the guarantor record
+    const { data: existingGuarantor, error: findError } = await supabase
+      .from("loan_guarantors")
+      .select("*")
+      .eq("loan_id", loan.id)
+      .eq("guarantor_id", guarantorId)
+      .maybeSingle();
+
+    let guarantorRecord;
+    if (existingGuarantor) {
+      // Update existing record
+      const { data, error } = await supabase
+        .from("loan_guarantors")
+        .update({
+          status: "confirmed",
+          consented_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingGuarantor.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error updating guarantor:", error);
+        res.status(500).json({ error: "Failed to confirm guarantee: " + error.message });
+        return;
+      }
+      guarantorRecord = data;
+    } else {
+      // Create new guarantor record
+      const { data, error } = await supabase
+        .from("loan_guarantors")
+        .insert({
+          loan_id: loan.id,
+          guarantor_id: guarantorId,
+          status: "confirmed",
+          consented_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating guarantor:", error);
+        res.status(500).json({ error: "Failed to create guarantee record: " + error.message });
+        return;
+      }
+      guarantorRecord = data;
+    }
+
+    res.json({
+      success: true,
+      message: "Guarantee confirmed successfully",
+      guarantee: {
+        id: guarantorRecord.id,
+        loanId: loan.id,
+        loanNumber: loan.loan_id,
+        guarantorId: guarantorId,
+        guarantorName: guarantorProfile.name || guarantorProfile.email,
+        status: "confirmed",
+        confirmedAt: guarantorRecord.consented_at,
+      },
+    });
+  } catch (err) {
+    console.error("Error confirming guarantee:", err);
+    res.status(500).json({ error: "Failed to confirm guarantee" });
+  }
+});
+
+// Decline guarantee (guarantor rejects the request)
+router.post("/loans/:id/guarantors/decline", async (req, res): Promise<void> => {
+  const loanId = req.params.id;
+  const { guarantorId, reason } = req.body;
+
+  if (!guarantorId) {
+    res.status(400).json({ error: "guarantorId is required" });
+    return;
+  }
+
+  try {
+    // Get the loan
+    const { data: loan, error: loanError } = await supabase
+      .from("loans")
+      .select("id, loan_id")
+      .eq("id", loanId)
+      .single();
+
+    if (loanError || !loan) {
+      res.status(404).json({ error: "Loan not found" });
+      return;
+    }
+
+    // Update the guarantor record
+    const { data, error } = await supabase
+      .from("loan_guarantors")
+      .update({
+        status: "rejected",
+        updated_at: new Date().toISOString(),
+        consent_reason: reason || null,
+      })
+      .eq("loan_id", loan.id)
+      .eq("guarantor_id", guarantorId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error declining guarantee:", error);
+      res.status(500).json({ error: "Failed to decline guarantee: " + error.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: "Guarantee declined",
+      guarantee: {
+        id: data.id,
+        status: "rejected",
+      },
+    });
+  } catch (err) {
+    console.error("Error declining guarantee:", err);
+    res.status(500).json({ error: "Failed to decline guarantee" });
+  }
+});
+
+// Get current user's guarantor requests (for guarantors viewing incoming requests)
+router.get("/guarantor/pending-requests", async (req, res): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.status(401).json({ error: "Authorization required" });
+    return;
+  }
+
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    // Get user profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    // Get pending guarantor requests where this user is the guarantor
+    const { data: requests, error } = await supabase
+      .from("loan_guarantors")
+      .select(`
+        *,
+        loans:loan_id(id, loan_id, amount, tenure_months, status, created_at),
+        borrower:loans!loan_id(profiles!loans_profile_id_fkey(name, email, phone))
+      `)
+      .eq("guarantor_id", profile.id)
+      .in("status", ["pending", "requested", "scanned"]);
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      requests: (requests ?? []).map(r => ({
+        id: r.id,
+        loanId: r.loans?.id,
+        loanNumber: r.loans?.loan_id,
+        amount: r.loans?.amount,
+        tenure: r.loans?.tenure_months,
+        borrowerName: r.borrower?.profiles?.name || r.borrower?.profiles?.email || "Unknown",
+        status: r.status,
+        requestedAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error fetching pending requests:", err);
+    res.status(500).json({ error: "Failed to fetch requests" });
+  }
+});
+
+// Get all guarantor requests for current user
+router.get("/guarantor/requests", async (req, res): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.status(401).json({ error: "Authorization required" });
+    return;
+  }
+
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    const { data: requests, error } = await supabase
+      .from("loan_guarantors")
+      .select(`
+        *,
+        loans:loan_id(id, loan_id, amount, tenure_months, status, created_at)
+      `)
+      .eq("guarantor_id", profile.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      requests: (requests ?? []).map(r => ({
+        id: r.id,
+        loanId: r.loans?.id,
+        loanNumber: r.loans?.loan_id,
+        amount: r.loans?.amount,
+        status: r.status,
+        consentedAt: r.consented_at,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error fetching requests:", err);
+    res.status(500).json({ error: "Failed to fetch requests" });
+  }
+});
+
+// Accept guarantor request
+router.post("/guarantor/requests/:id/accept", async (req, res): Promise<void> => {
+  const requestId = req.params.id;
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) {
+    res.status(401).json({ error: "Authorization required" });
+    return;
+  }
+
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, name, email")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    const { data: guarantorRequest, error: findError } = await supabase
+      .from("loan_guarantors")
+      .select("*")
+      .eq("id", requestId)
+      .eq("guarantor_id", profile.id)
+      .single();
+
+    if (findError || !guarantorRequest) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("loan_guarantors")
+      .update({
+        status: "confirmed",
+        consented_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", requestId)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: "Failed to accept request: " + error.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: "Guarantor request accepted",
+      request: {
+        id: data.id,
+        status: data.status,
+        confirmedAt: data.consented_at,
+      },
+    });
+  } catch (err) {
+    console.error("Error accepting request:", err);
+    res.status(500).json({ error: "Failed to accept request" });
+  }
+});
+
+// Decline guarantor request
+router.post("/guarantor/requests/:id/decline", async (req, res): Promise<void> => {
+  const requestId = req.params.id;
+  const { reason } = req.body;
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader) {
+    res.status(401).json({ error: "Authorization required" });
+    return;
+  }
+
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("loan_guarantors")
+      .update({
+        status: "rejected",
+        updated_at: new Date().toISOString(),
+        consent_reason: reason || null,
+      })
+      .eq("id", requestId)
+      .eq("guarantor_id", profile.id)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: "Failed to decline request: " + error.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: "Guarantor request declined",
+      request: {
+        id: data.id,
+        status: data.status,
+      },
+    });
+  } catch (err) {
+    console.error("Error declining request:", err);
+    res.status(500).json({ error: "Failed to decline request" });
+  }
+});
+
 export default router;
