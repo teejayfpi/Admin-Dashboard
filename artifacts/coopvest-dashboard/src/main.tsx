@@ -9,12 +9,19 @@ import { getApiBaseUrl } from "@/lib/api";
 const baseUrl = `${getApiBaseUrl()}/api/v2/admin`;
 setBaseUrl(baseUrl);
 
-// Set up auth token getter for API calls using the api-client format
-setAuthTokenGetter(async () => {
-  const { supabase } = await import("@/lib/supabase");
-  if (!supabase) return null;
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
-});
+// Set up auth token getter for API calls
+// Use SERVICE_ROLE_KEY for admin API calls (service-to-service auth)
+const serviceToken = import.meta.env.VITE_API_SERVICE_TOKEN;
+if (serviceToken) {
+  setAuthTokenGetter(() => serviceToken);
+} else {
+  // Fallback to Supabase session token for non-admin endpoints
+  setAuthTokenGetter(async () => {
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  });
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
