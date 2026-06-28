@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 // ── API helper ─────────────────────────────────────────────────────────────────
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAccessToken();

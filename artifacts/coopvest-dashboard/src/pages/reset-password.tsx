@@ -33,7 +33,7 @@ export default function ResetPassword() {
 
       // First try custom API verification
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || "";
         const response = await fetch(`${apiUrl}/api/password-reset/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -91,7 +91,7 @@ export default function ResetPassword() {
 
     // First try custom API
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "";
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || "";
       const response = await fetch(`${apiUrl}/api/password-reset/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

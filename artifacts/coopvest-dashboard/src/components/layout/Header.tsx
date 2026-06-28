@@ -75,7 +75,7 @@ export function Header({ onOpenSearch, onOpenMobileMenu }: HeaderProps) {
 
   // Mark single notification as read
   const markRead = useCallback(async (id: number) => {
-    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || "";
     try {
       await fetch(`${apiUrl}/api/notifications/${id}/read`, { method: "POST" });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
@@ -84,7 +84,7 @@ export function Header({ onOpenSearch, onOpenMobileMenu }: HeaderProps) {
 
   // Mark all as read
   const markAllRead = useCallback(async () => {
-    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || "";
     try {
       await fetch(`${apiUrl}/api/notifications/read-all`, { method: "POST" });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });

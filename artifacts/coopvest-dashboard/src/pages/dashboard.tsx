@@ -78,7 +78,7 @@ async function fetchAnalyticsData(): Promise<AnalyticsData | null> {
     const token = await getAccessToken();
     if (!token) return null;
 
-    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || "";
     const headers = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
 
     const [repaymentRes, riskRes, defaulterRes] = await Promise.all([
