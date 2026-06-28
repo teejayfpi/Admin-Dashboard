@@ -16,8 +16,7 @@ import {
   Smartphone, Clock, User, Save, Plus, Trash2, Edit3,
   FileText, MessageSquare, BookOpen, CheckCircle, Loader2, MoveUp, MoveDown,
 } from "lucide-react";
-
-const BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+import { api, getAdminApiUrl } from "@/lib/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface MobileFeature {
@@ -78,12 +77,7 @@ function useFetchFeatures() {
   return useQuery<{ features: MobileFeature[] }>({
     queryKey: ["/api/mobile-features"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}/api/mobile-features`);
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || "Failed to fetch features");
-      }
-      return res.json();
+      return api.get<{ features: MobileFeature[] }>("/mobile-features");
     },
   });
 }
@@ -91,15 +85,7 @@ function useToggleFeature() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ featureId, enabled }: { featureId: string; enabled: boolean }) => {
-      const res = await fetch(`${BASE}/api/mobile-features`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ featureId, enabled }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || "Failed to toggle feature");
-      }
-      return res.json();
+      return api.put<{ success: boolean; message?: string }>("/mobile-features", { featureId, enabled });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/mobile-features"] }),
   });
