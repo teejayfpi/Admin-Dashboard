@@ -11,6 +11,7 @@ services:
     region: oregon
     buildCommand: bash render-build.sh
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    rootDir: artifacts/api-server
     id: srv-d8epoj42m8qs7396p1tg
     envVars:
       - key: NODE_ENV
