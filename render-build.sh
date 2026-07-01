@@ -6,6 +6,7 @@ cd "$SCRIPT_DIR"
 
 echo "Installing dependencies for api-server..."
 cd artifacts/api-server
+rm -rf node_modules package-lock.json
 npm install --legacy-peer-deps
 
 echo "Building api-server..."
