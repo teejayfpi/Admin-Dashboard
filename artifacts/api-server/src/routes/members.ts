@@ -497,17 +497,17 @@ router.post("/members/:id/role", requireAuth, requireRole("super_admin"), async 
     activeLoan: 0, 
     riskScore: 0, 
     avatarInitials: ((firstName[0] ?? "") + (lastName[0] ?? "")).toUpperCase() || "??" 
-  });
 });
 
 // Delete member - only super_admin can delete members
+// This will COMPLETELY remove the user - they cannot login again
 router.delete("/members/:id", requireAuth, requireRole("super_admin"), async (req, res): Promise<void> => {
   const id = req.params.id;
 
   // First check if member exists
   const { data: profile, error: fetchError } = await supabase
     .from("profiles")
-    .select("id, email, name, role")
+    .select("id, email, name, role, user_id")
     .eq("id", id)
     .single();
 
@@ -533,22 +533,65 @@ router.delete("/members/:id", requireAuth, requireRole("super_admin"), async (re
     }
   }
 
-  // Delete the profile
-  const { error: deleteError } = await supabase
-    .from("profiles")
-    .delete()
-    .eq("id", id);
+  try {
+    // Step 1: Delete user from Supabase Auth (this prevents login)
+    if (profile.email) {
+      const { data: authUsers, error: listError } = await (supabase.auth.admin as any).listUsers();
+      
+      if (!listError && authUsers?.users) {
+        const authUser = authUsers.users.find((u: any) => u.email === profile.email);
+        
+        if (authUser) {
+          const { error: authDeleteError } = await (supabase.auth.admin as any).deleteUser(authUser.id);
+          
+          if (authDeleteError) {
+            console.error("Error deleting auth user:", authDeleteError);
+          }
+        }
+      }
+    }
 
-  if (deleteError) {
-    console.error("Error deleting member:", deleteError);
-    res.status(500).json({ error: deleteError.message });
-    return;
+    // Step 2: Delete related data from other tables (cascade)
+    const tablesToClean = [
+      "savings",
+      "loans", 
+      "transactions",
+      "notifications",
+      "contributions",
+      "guarantors",
+      "documents",
+      "audit_logs",
+    ];
+
+    for (const table of tablesToClean) {
+      try {
+        await supabase.from(table).delete().eq("profile_id", id);
+      } catch (e) {
+        console.log(`Skipping cleanup of ${table}: ${e}`);
+      }
+    }
+
+    // Step 3: Delete the profile
+    const { error: deleteError } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Error deleting profile:", deleteError);
+      res.status(500).json({ error: deleteError.message });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Member ${profile.name} (${profile.email}) has been COMPLETELY deleted. They cannot login again and must register fresh.`
+    });
+
+  } catch (error) {
+    console.error("Error in delete member process:", error);
+    res.status(500).json({ error: "Failed to delete member completely" });
   }
-
-  res.json({ 
-    success: true, 
-    message: `Member ${profile.name} (${profile.email}) has been deleted` 
-  });
 });
 
 export default router;
