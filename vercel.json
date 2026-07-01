@@ -2,8 +2,5 @@
   "version": 2,
   "framework": null,
   "buildCommand": "echo skip",
-  "outputDirectory": "artifacts/coopvest-dashboard/dist/public",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "outputDirectory": "artifacts/coopvest-dashboard/dist/public"
 }
