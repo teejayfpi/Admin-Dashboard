@@ -6,9 +6,53 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-// Fix #5: use toast instead of native alert()
 import { useToast } from "@/hooks/use-toast";
 import { isValidAdminRole } from "@/lib/permissions";
+
+// Helper to parse user agent for device info
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  let deviceType = 'desktop';
+  let browser = 'unknown';
+  let os = 'unknown';
+  
+  if (/mobile/i.test(ua)) deviceType = 'mobile';
+  else if (/tablet|ipad/i.test(ua)) deviceType = 'tablet';
+  
+  if (/edge/i.test(ua)) browser = 'Edge';
+  else if (/chrome/i.test(ua)) browser = 'Chrome';
+  else if (/safari/i.test(ua)) browser = 'Safari';
+  else if (/firefox/i.test(ua)) browser = 'Firefox';
+  
+  if (/windows/i.test(ua)) os = 'Windows';
+  else if (/mac/i.test(ua)) os = 'macOS';
+  else if (/linux/i.test(ua)) os = 'Linux';
+  else if (/android/i.test(ua)) os = 'Android';
+  else if (/ios|iphone|ipad/i.test(ua)) os = 'iOS';
+  
+  return { deviceType, browser, os };
+}
+
+// Log login attempt to backend
+async function logLoginAttempt(email: string, success: boolean, failureReason?: string) {
+  try {
+    const deviceInfo = getDeviceInfo();
+    await fetch('/api/login-history/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        success,
+        failure_reason: failureReason,
+        device_type: deviceInfo.deviceType,
+        browser: deviceInfo.browser,
+        os: deviceInfo.os,
+      }),
+    });
+  } catch (err) {
+    console.error('Failed to log login attempt:', err);
+  }
+}
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -53,6 +97,8 @@ export default function Login() {
     const { data: sessionData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
+      // Log failed login
+      logLoginAttempt(email, false, authError.message);
       setError(authError.message);
       setIsLoading(false);
       return;
@@ -62,17 +108,22 @@ export default function Login() {
     if (sessionData?.user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, id')
         .eq('id', sessionData.user.id)
         .maybeSingle();
 
       if (!isValidAdminRole(profile?.role ?? null)) {
         // Sign out and show error - only admins, operators, and viewers can access
         await supabase.auth.signOut();
+        // Log failed login - not admin
+        logLoginAttempt(email, false, 'Not an admin user');
         setError("Access denied. Only authorized administrators can access this dashboard.");
         setIsLoading(false);
         return;
       }
+      
+      // Log successful login
+      logLoginAttempt(email, true);
     }
 
     setLocation("/dashboard");

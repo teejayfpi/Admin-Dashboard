@@ -3,7 +3,54 @@ import { supabase } from "../lib/supabase";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router: IRouter = Router();
-router.use(requireAuth);
+
+// Public endpoint to log login attempts (no auth required)
+router.post("/login-history/log", async (req, res): Promise<void> => {
+  const { email, success, failure_reason, ip_address, user_agent, device_type, browser, os } = req.body;
+
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+
+  try {
+    // Try to find the profile by email
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, user_id")
+      .eq("email", email)
+      .maybeSingle();
+
+    const insertData: any = {
+      email,
+      success: success || false,
+      failure_reason: failure_reason || null,
+      ip_address: ip_address || null,
+      user_agent: user_agent || null,
+      device_type: device_type || null,
+      browser: browser || null,
+      os: os || null,
+      created_at: new Date().toISOString(),
+    };
+
+    if (profile) {
+      insertData.profile_id = profile.id;
+      insertData.user_id = profile.user_id;
+    }
+
+    const { error } = await supabase.from("login_history").insert(insertData);
+
+    if (error) {
+      console.error("Error logging login attempt:", error);
+      // Don't return error to client - logging failure shouldn't break login
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error logging login attempt:", err);
+    res.json({ success: true }); // Still return success
+  }
+});
 
 // Get login history for a specific member
 router.get("/members/:memberId/login-history", requireRole("admin", "super_admin"), async (req, res): Promise<void> => {
