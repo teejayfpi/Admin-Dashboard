@@ -56,7 +56,8 @@ export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${getAdminApiUrl()}${endpoint}`;
+  const baseUrl = getAdminApiUrl();
+  const url = endpoint.startsWith('/') ? `${baseUrl}${endpoint}` : `${baseUrl}/${endpoint}`;
   const headers = await getAuthHeaders();
   
   const response = await fetch(url, {
