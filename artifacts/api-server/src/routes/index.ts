@@ -41,6 +41,8 @@ import excelUploadsRouter from "./excel-uploads";
 import depositsRouter from "./deposits";
 // Statistics routes for frontend dashboard
 import statisticsRouter from "./statistics";
+// KYC routes for mobile app
+import kycRouter from "./kyc";
 
 const router: IRouter = Router();
 
@@ -64,6 +66,7 @@ router.use(setupRouter);
 router.use(requireAuth);
 router.use(dashboardRouter);
 router.use(statisticsRouter);
+router.use(kycRouter);
 router.use(membersRouter);
 router.use(loansRouter);
 router.use(contributionsRouter);

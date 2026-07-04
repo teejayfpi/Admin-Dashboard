@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
+import multer from "multer";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -50,6 +51,23 @@ app.use(
 
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
+
+// File upload middleware - use memory storage for Supabase upload
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Make upload middleware available to routes
+app.set('upload', upload);
+
 app.use("/api", router);
 
 // Global Express error handler
